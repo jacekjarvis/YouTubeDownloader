@@ -1,5 +1,8 @@
-﻿using VideoLibrary;
-using Xabe.FFmpeg;
+﻿using FFMpegCore; //Install-Package FFMpegCore //Install-Package Xabe.FFmpeg.Downloader
+using VideoLibrary;
+using System.Web;
+using Xabe.FFmpeg.Downloader;
+//using Xabe.FFmpeg;
 
 public class YouTubeDownloader
 {
@@ -12,11 +15,19 @@ public class YouTubeDownloader
     public static void Main(string[] args)
     {
         Console.WriteLine("Enter your Youtube Link:");
-        //string link = @"https://www.youtube.com/watch?v=BF0uf7apZDQ";
+        //string link = @"https://www.youtube.com/watch?v=OBF4kZS9baw";
         string link =  Console.ReadLine().Trim();
 
         //Console.WriteLine("Processing");
         //GetVideoData(link);
+
+        Console.WriteLine("Audio ONLY? Y or N:");
+        string selectedAudioOnly = Console.ReadLine().Trim().ToUpper();
+
+        if (selectedAudioOnly == "Y")
+        {
+            audioOnly = true;
+        }
 
         Console.WriteLine("Downloading");
 
@@ -24,24 +35,51 @@ public class YouTubeDownloader
         string destination = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
         string filePath =  $@"{destination}\{video.FullName}";
 
-        if (File.Exists(filePath))
-        {
-            File.Delete(filePath);
-        }
 
-        if (!audioOnly) 
+        DeleteFile(filePath);
+
+        File.WriteAllBytes(filePath, video.GetBytes());
+
+        if (audioOnly) 
         {
-            //download the full movie
-            File.WriteAllBytes(filePath, video.GetBytes());
-        }
-        else
-        {
-            FFmpeg.ExtractAudio(audiomp4, txtFilePath + TargetVideo.ToList()[0].Title + "mp3");
+            string tempFileName = filePath;
+            filePath = $@"{destination}\{video.Title}.mp3";
+
+            DeleteFile(filePath);
+
+            //Console.WriteLine(tempFileName);
+            //Console.WriteLine(filePath);
+
+            if (!File.Exists("ffmpeg.exe"))
+                FFmpegDownloader.GetLatestVersion(FFmpegVersion.Official);
+
+            ConvertAudio(tempFileName, filePath);
+            DeleteFile(tempFileName);
+
         }
 
         Console.WriteLine("FINISHED - File Downloaded to: ");
         Console.WriteLine($"{destination}");
         Console.ReadLine();
+    }
+
+    public static async Task ConvertAudio(string tempFileName, string filePath)
+    {
+
+        //var snippet = FFmpeg.Conversions.FromSnippet.Convert(tempFileName, filePath);
+        //var snippet = FFmpeg.Conversions.FromSnippet.ExtractAudio(tempFileName, filePath);
+        //snippet.Start();
+        Console.WriteLine("Converting to mp3...");
+        FFMpeg.ExtractAudio(tempFileName, filePath);
+    }
+
+
+    public static void DeleteFile(string path)
+    {
+        if (File.Exists(path))
+        {
+            File.Delete(path);
+        }
     }
 
     private static void GetVideoData(string link, bool playlist = false)
