@@ -54,7 +54,7 @@ public class YouTubeDownloader
                 FFmpegDownloader.GetLatestVersion(FFmpegVersion.Official);
 
             ConvertAudio(tempFileName, filePath);
-            DeleteFile(tempFileName);
+            //DeleteFile(tempFileName);
 
         }
 
