@@ -19,7 +19,7 @@ public class YouTubeDownloader
         string link = Console.ReadLine().Trim();
 
 
-        Console.WriteLine("Getting data...");
+        Console.WriteLine("\nGetting data...");
 
         //var videos = youtube.GetAllVideosAsync(link).GetAwaiter().GetResult().ToList();
         List<YouTubeVideo> videos = youtube.GetAllVideos(link).ToList();
@@ -36,11 +36,14 @@ public class YouTubeDownloader
         YouTubeVideo video;
         if (videos.Count == 0)
         {
-            Console.WriteLine("Only one available video option. Getting this by default.");
             video = youtube.GetVideo(link);
+            Console.WriteLine(video.FullName);
+            Console.WriteLine($"{1}. Resolution {video.Resolution} , Audio Bitrate {video.AudioBitrate} {video.AudioFormat}");
+            
         }
         else
         {
+            Console.WriteLine(videos[0].FullName);
             int highestRes = 0;
             int highestResIndex = 0;
             for (int i = 0; i<videos.Count; i++)
