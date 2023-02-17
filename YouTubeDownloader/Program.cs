@@ -19,12 +19,7 @@ public class YouTubeDownloader
         Console.WriteLine("Enter your Youtube Link:");
         //string link = @"https://www.youtube.com/watch?v=17ZrLitIfRE";
         string link = Console.ReadLine().Trim();
-
-        Console.WriteLine("Video or Audio Only? (Enter V or A)");
-        Console.WriteLine("(DEFAULT is Video)");
-
-        string mediaType = Console.ReadLine().Trim();
-
+        string mediaType = PromptUserForMediaType();
 
         Console.WriteLine("\nGetting data...");
 
@@ -33,27 +28,19 @@ public class YouTubeDownloader
 
         if (mediaType.ToUpper() == "V")
         {
-            videos = videos.Where(vid => vid.Format == VideoFormat.Mp4 && vid.AudioBitrate > 0).ToList(); 
+            videos = videos.Where(vid => vid.Format == VideoFormat.Mp4 && vid.AudioBitrate > 0).ToList();
         }
         else
         {
             videos = videos.Where(r => r.AdaptiveKind == AdaptiveKind.Audio).ToList();
         }
-        
-        
-        
 
-
-        //foreach (var b in audios)
-        //{
-        //    Console.WriteLine($"{b.AudioBitrate} {b.Format} {b.AudioFormat}");
-
-        //}
-        
         YouTubeVideo video = SelectMediaOption(link, videos, mediaType);
+        DownloadFile(mediaType, video);
+    }
 
-
-
+    private static void DownloadFile(string mediaType, YouTubeVideo video)
+    {
         //Thread.Sleep(450);
         string destination = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
 
@@ -70,6 +57,21 @@ public class YouTubeDownloader
         Console.WriteLine("FINISHED: ");
         Console.WriteLine($"{filePath}");
         Console.ReadLine();
+    }
+
+    private static string PromptUserForMediaType()
+    {
+        Console.WriteLine("Video or Audio Only? (Enter V or A)");
+        Console.WriteLine("(DEFAULT is Video)");
+
+        string mediaType = Console.ReadLine().Trim();
+
+        if (mediaType == "" || mediaType == null )
+        {
+            return "V";
+        }
+
+        return mediaType;
     }
 
     private static YouTubeVideo SelectMediaOption(string link, List<YouTubeVideo> videos, string mediaType)
@@ -118,7 +120,7 @@ public class YouTubeDownloader
             {
                 string type = mediaType.ToUpper() == "V" ? "Resolution" : "AudioBitrate";
 
-                Console.WriteLine($"Select a Resolution Option (DEFAULT is Option: {highestQualityIndex+1}. {type} {highestQuality}");
+                Console.WriteLine($"Select a Resolution Option (DEFAULT is Option: {highestQualityIndex+1}. {type} {highestQuality})");
                 string selectedResOption = Console.ReadLine().Trim();
 
                 if (selectedResOption != "" && selectedResOption != null)
