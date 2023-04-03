@@ -42,21 +42,58 @@ public class YouTubeDownloader
     private static void DownloadFile(string mediaType, YouTubeVideo video)
     {
         //Thread.Sleep(450);
-        string destination = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-
-        string audioFileName = $"{video.FullName}.{video.AudioFormat}";
-        string fileName = mediaType.ToUpper() == "V" ? video.FullName : audioFileName;
-        string filePath = $@"{destination}\{fileName}";
+        string filePath = GetFilePath(mediaType, video);
         DeleteFile(filePath);
 
         Console.WriteLine();
         Console.WriteLine("Downloading...");
-        File.WriteAllBytes(filePath, video.GetBytes());
-        //File.WriteAllBytes(filePath, audios[0].GetBytes());
 
-        Console.WriteLine("FINISHED: ");
-        Console.WriteLine($"{filePath}");
+        try
+        {
+            File.WriteAllBytes(filePath, video.GetBytes());
+            //File.WriteAllBytes(filePath, audios[0].GetBytes());
+
+            Console.WriteLine("FINISHED: ");
+            Console.WriteLine($"{filePath}");
+
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Error occured while download/writing the file");
+            Console.WriteLine(ex.ToString());
+        }
         Console.ReadLine();
+    }
+
+    private static string GetFilePath(string mediaType, YouTubeVideo video)
+    {
+        string destination = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+
+        string audioFileName = $"{video.FullName}.{video.AudioFormat}";
+        string fileName = mediaType.ToUpper() == "V" ? video.FullName : audioFileName;
+        fileName = ValidateFileName(fileName);
+
+        string filePath = Path.Combine(destination, fileName);
+
+        return filePath;
+    }
+
+    private static string ValidateFileName(string fileName)
+    {
+        //Ensure that the filename has Valid FileNameChars - so that we can save the file
+        char[] invalidChars = Path.GetInvalidFileNameChars();
+
+        foreach (char c in invalidChars)
+        {
+            fileName = fileName.Replace(c.ToString(), "");
+        }
+
+        if (fileName.Length == 0)
+        {
+            DateTime now = DateTime.Now;
+            return $"YouTube_{now.Year}-{now.Month}-{now.Day}";
+        }
+        return fileName;
     }
 
     private static string PromptUserForMediaType()
@@ -136,9 +173,16 @@ public class YouTubeDownloader
 
     public static void DeleteFile(string path)
     {
-        if (File.Exists(path))
+        try
         {
-            File.Delete(path);
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch 
+        { 
+            Console.WriteLine("Error Deleting the existing File"); 
         }
     }
 
