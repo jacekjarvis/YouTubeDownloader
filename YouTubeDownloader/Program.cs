@@ -3,8 +3,6 @@ using VideoLibrary;
 using System.Web;
 //using Xabe.FFmpeg.Downloader;
 using System;
-using System.Security.Cryptography;
-using System.Runtime.ConstrainedExecution;
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
@@ -14,11 +12,11 @@ public class YouTubeDownloader
 {
     public static YouTube youtube = YouTube.Default;
 
-
     public static void Main(string[] args)
     {
-        Console.WriteLine("JARVO'S YOUTUBE DOWNLOADER");
-        Console.WriteLine("--------------------------");
+        Console.WriteLine("GENN-SAMA'S YOUTUBE DOWNLOADER");
+        Console.WriteLine("------------------------------");
+
         Console.WriteLine("Enter your Youtube Link:");
         //string link = @"https://www.youtube.com/watch?v=17ZrLitIfRE";
         string link = Console.ReadLine().Trim();
@@ -31,11 +29,14 @@ public class YouTubeDownloader
 
         if (mediaType.ToUpper() == "V")
         {
-            videos = videos.Where(vid => vid.Format == VideoFormat.Mp4 && vid.AudioBitrate > 0).ToList();
+            videos = videos.Where(vid => vid.Format == VideoFormat.Mp4 && vid.AudioBitrate > 0)
+                           .OrderByDescending(vid => vid.Resolution).ToList();
         }
         else
         {
-            videos = videos.Where(r => r.AdaptiveKind == AdaptiveKind.Audio).ToList();
+            YouTubeVideo v = videos.Where(r => r.AdaptiveKind == AdaptiveKind.Audio).FirstOrDefault();
+            videos.Clear();
+            videos.Add(v);
         }
 
         YouTubeVideo video = SelectMediaOption(link, videos, mediaType);
@@ -101,12 +102,12 @@ public class YouTubeDownloader
 
     private static string PromptUserForMediaType()
     {
-        Console.WriteLine("Video or Audio Only? (Enter V or A)");
-        Console.WriteLine("(DEFAULT is Video)");
+        Console.WriteLine("Select a format - Enter V or A");
+        Console.WriteLine("[V]ideo (DEFAULT)");
+        Console.WriteLine("[A]udio");
 
         string mediaType = Console.ReadLine().Trim();
-
-        if (mediaType == "" || mediaType == null )
+        if (String.IsNullOrEmpty(mediaType))
         {
             return "V";
         }
@@ -118,57 +119,35 @@ public class YouTubeDownloader
     {
         YouTubeVideo video = videos[0];
         Console.WriteLine(videos[0].Title);
-        if (videos.Count == 0)
-        {
-            string message = $"{1}. Resolution {video.Resolution} , Audio Bitrate {video.AudioBitrate} {video.AudioFormat}";
 
-            if (mediaType.ToUpper() == "A")
-            {
-                message = $"{video.AudioBitrate} {video.AudioFormat}";
-            }
+        if (mediaType.ToUpper() == "A")
+        {
+            return video;
+        }
+
+        if (videos.Count == 1)
+        {
+            string message = $"[{1}] Resolution {video.Resolution} , Audio Bitrate {video.AudioBitrate} {video.AudioFormat}";
             Console.WriteLine(message);
             Console.WriteLine();
-
         }
         else
         {
-            
-            int highestQuality = 0;
-            int highestQualityIndex = 0;
-            for (int i = 0; i<videos.Count; i++)
+            Console.WriteLine($"Select a Resolution - Enter a number:");
+            int i = 1;
+            foreach(var vid in videos)
             {
-                string message = $"{i+1}. Resolution {videos[i].Resolution} , Audio Bitrate {videos[i].AudioBitrate} {videos[i].AudioFormat}";
-                var quality = videos[i].Resolution;
-
-                if (mediaType.ToUpper() == "A")
-                {
-                    message = $"{i+1}. {videos[i].AudioBitrate} {videos[i].AudioFormat}";
-                    quality = videos[i].AudioBitrate;
-                }
+                string defaultString = i == 1 ? "(DEFAULT)" : ""; 
+                string message = $"[{i}] Resolution {vid.Resolution} , Audio Bitrate {vid.AudioBitrate} {vid.AudioFormat} {defaultString}";
                 Console.WriteLine(message);
-
-                if (quality > highestQuality)
-                {
-                    highestQuality = mediaType.ToUpper() == "V" ? videos[i].Resolution : videos[i].AudioBitrate;
-                    highestQualityIndex = i;
-                }
+                i++;
             }
-            int finalResOption = highestQualityIndex;
-            Console.WriteLine();
 
-            if (videos.Count != 1)
+            string resolution = Console.ReadLine().Trim();
+            if (!String.IsNullOrEmpty(resolution))
             {
-                string type = mediaType.ToUpper() == "V" ? "Resolution" : "AudioBitrate";
-
-                Console.WriteLine($"Select a Resolution Option (DEFAULT is Option: {highestQualityIndex+1}. {type} {highestQuality})");
-                string selectedResOption = Console.ReadLine().Trim();
-
-                if (selectedResOption != "" && selectedResOption != null)
-                {
-                    finalResOption = int.Parse(selectedResOption) - 1;
-                }
+                video = videos[int.Parse(resolution) - 1];
             }
-            video = videos[finalResOption];
         }
 
         return video;
@@ -189,37 +168,6 @@ public class YouTubeDownloader
         }
     }
 
-    private static void GetVideoData(string link, bool playlist = false)
-    {
-        var videoData = youtube.GetAllVideos(link);
-        var resolution = videoData.Where(r => r.AdaptiveKind == AdaptiveKind.Video && r.Format== VideoFormat.Mp4).
-                         Select(r => r.Resolution).Distinct().ToList();
-        var bitRate = videoData.Where(r => r.AdaptiveKind == AdaptiveKind.Audio).Select(r => r.AudioBitrate).Distinct().ToList();
-
-        resolution.Sort();
-        bitRate.Sort();
-
-        Console.WriteLine("Select reslolution: ");
-
-        int i = 1;
-        foreach (var item in resolution)
-        {
-            Console.WriteLine($"{i}) {item}");
-            i++;
-
-        }
-
-        Console.WriteLine("Select Audio Quality (Bit rate): ");
-
-        i = 1;
-        foreach (var item in bitRate)
-        {
-
-            Console.WriteLine($"{i}) {item}");
-            i++;
-        }
-
-    }
 }
 
 
