@@ -7,11 +7,12 @@ using System.IO;
 
 public class YouTubeDownloaderApp
 {
-    public YouTube Youtube { get; }
+    private const string Version = "2024.06.04";
+    private YouTube _youTube { get; }
 
     public YouTubeDownloaderApp()
     {
-        Youtube = YouTube.Default;
+        _youTube = YouTube.Default;
     }
 
     public void Run()
@@ -29,7 +30,7 @@ public class YouTubeDownloaderApp
     private void GetMedia(string link, string mediaType)
     {
         Console.WriteLine(Environment.NewLine + "Getting data...");
-        List<YouTubeVideo> videos = Youtube.GetAllVideos(link).ToList();
+        List<YouTubeVideo> videos = _youTube.GetAllVideos(link).ToList();
 
         if (mediaType.ToUpper() == "V")
         {
@@ -60,7 +61,7 @@ public class YouTubeDownloaderApp
 
     private void PrintAppTitle()
     {
-        Console.WriteLine("GENN-SAMA'S YOUTUBE DOWNLOADER v2024.02.04");
+        Console.WriteLine($"GENN-SAMA'S YOUTUBE DOWNLOADER v{Version}");
         Console.WriteLine("------------------------------------------");
     }
 
@@ -99,14 +100,14 @@ public class YouTubeDownloaderApp
 
         string audioFileName = $"{video.FullName}.{video.AudioFormat}";
         string fileName = mediaType.ToUpper() == "V" ? video.FullName : audioFileName;
-        fileName = ValidateFileName(fileName);
+        fileName = GetValidFileName(fileName);
 
         string filePath = Path.Combine(destination, fileName);
 
         return filePath;
     }
 
-    private  string ValidateFileName(string fileName)
+    private  string GetValidFileName(string fileName)
     {
         //Ensure that the filename has Valid FileNameChars - so that we can save the file
         char[] invalidChars = Path.GetInvalidFileNameChars();
