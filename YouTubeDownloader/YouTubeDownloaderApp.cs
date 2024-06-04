@@ -159,23 +159,15 @@ public class YouTubeDownloaderApp
                              $"Audio Bitrate {video.AudioBitrate} {video.AudioFormat}" +
                              Environment.NewLine ;
             Console.WriteLine(message);
-        }
-        else
-        {
-            PromptUserForTheResolution(videos);
-            video = ReadTheResolution(videos);
+            return video;
         }
 
-        return video;
-    }
+        PromptUserForTheResolution(videos);
+        var selectedVideo = ReadTheResolution(videos);
 
-    private YouTubeVideo ReadTheResolution(List<YouTubeVideo> videos)
-    {
-        YouTubeVideo video = default;
-        string resolution = Console.ReadLine().Trim();
-        if (!string.IsNullOrEmpty(resolution))
+        if (selectedVideo != null)
         {
-            video = videos[int.Parse(resolution) - 1];
+            return selectedVideo;
         }
 
         return video;
@@ -192,6 +184,18 @@ public class YouTubeDownloaderApp
             Console.WriteLine(message);
             i++;
         }
+    }
+
+    private YouTubeVideo ReadTheResolution(List<YouTubeVideo> videos)
+    {
+        YouTubeVideo video = default;
+        string resolution = Console.ReadLine().Trim();
+        if (!string.IsNullOrEmpty(resolution))
+        {
+            video = videos[int.Parse(resolution) - 1];
+        }
+
+        return video;
     }
 
     public void DeleteFile(string path)
