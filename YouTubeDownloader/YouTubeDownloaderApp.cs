@@ -55,14 +55,15 @@ public class YouTubeDownloaderApp
         if (muxedStreams.Any())
         {
             var streamInfo = muxedStreams.First();
-            using var httpClient = new HttpClient();
-            var stream = httpClient.GetStreamAsync(streamInfo.Url).Result;
+            //using var httpClient = new HttpClient();
+            //var stream = httpClient.GetStreamAsync(streamInfo.Url).Result;
             
             var outputFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
                         $"{sanitizedTitle}.{streamInfo.Container}");
 
-            using var outputStream = File.Create(outputFilePath);
-            await stream.CopyToAsync(outputStream);
+            await youtube.Videos.Streams.DownloadAsync(streamInfo, outputFilePath);
+            //using var outputStream = File.Create(outputFilePath);
+            //await stream.CopyToAsync(outputStream);
 
             var datetime = DateTime.Now;
             Console.WriteLine("Download completed!");
