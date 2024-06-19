@@ -340,7 +340,7 @@ public class YoutubeDownloaderApp
 
     private void DownloadSelectedOption(int option)
     {
-        _youtubeDownloader.DownloadVideoOption(option, OutputPath).Wait();
+        _youtubeDownloader.DownloadMedia(option, OutputPath).Wait();
 
     }
 
