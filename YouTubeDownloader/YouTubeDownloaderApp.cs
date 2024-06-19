@@ -42,7 +42,7 @@ public class YoutubeDownloaderApp
         int option = 1;
         if (options.Count > 1 )
         {
-            //option = GetOption();
+            option = GetOption(options);
         }
 
         DownloadSelectedOption(option);
@@ -60,72 +60,10 @@ public class YoutubeDownloaderApp
         return _youtubeDownloader.GetVideoOptions().ToList();
     }
 
-
-    private async Task GetMediaAsync1(string videoUrl, string mediaType)
-    {
-        
-        //List<YouTubeVideo> videos = _youTube.GetAllVideos(videoUrl).ToList();
-
-        var video = youtube.Videos.GetAsync(videoUrl).Result;
-        var streamManifest = youtube.Videos.Streams.GetManifestAsync(videoUrl).Result;
-
-        //var streamInfo = streamManifest.GetMuxedStreams().GetWithHighestVideoQuality();
-
-        var muxedStreams = streamManifest.GetMuxedStreams().OrderByDescending(s => s.VideoQuality).ToList();
-
-        var sanitizedTitle = SanitizeTitle(video.Title);
-
-        //var stream = youtube.Videos.Streams.GetAsync(streamInfo).Result;
-
-        
-
-        if (muxedStreams.Any())
-        {
-            var streamInfo = muxedStreams.First();
-            //using var httpClient = new HttpClient();
-            //var stream = httpClient.GetStreamAsync(streamInfo.Url).Result;
-            
-            var outputFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
-                        $"{sanitizedTitle}.{streamInfo.Container}");
-
-            await youtube.Videos.Streams.DownloadAsync(streamInfo, outputFilePath);
-            //using var outputStream = File.Create(outputFilePath);
-            //await stream.CopyToAsync(outputStream);
-
-            var datetime = DateTime.Now;
-            Console.WriteLine("Download completed!");
-            Console.WriteLine($"Video saved as: {outputFilePath} {datetime}");
-        }
-        else
-        {
-            Console.WriteLine($"No suitable video stream found for {video.Title}.");
-        }
-    
-
-    //youtube.Videos.Streams.DownloadAsync(streamInfo, $"video.{streamInfo.Container}");
-    //await youtube.Videos.Streams.DownloadAsync(streamInfo, path);
-
-    //if (mediaType.ToUpper() == "V")
-    //{
-    //    videos = videos.Where(vid => vid.Format == VideoFormat.Mp4 && vid.AudioBitrate > 0)
-    //                   .OrderByDescending(vid => vid.Resolution).ToList();
-    //}
-    //else
-    //{
-    //    YouTubeVideo v = videos.Where(r => r.AdaptiveKind == AdaptiveKind.Audio).FirstOrDefault();
-    //    videos.Clear();
-    //    videos.Add(v);
-    //}
-
-    //YouTubeVideo video = SelectMediaOption(videoUrl, videos, mediaType);
-    //DownloadFile(mediaType, video);
-    Console.WriteLine("Get Media End");
-    }
-
     private string GetUrl()
     {
-        return @"https://www.youtube.com/watch?v=17ZrLitIfRE";  //For Testing
-        //return Console.ReadLine().Trim();
+        //return @"https://www.youtube.com/watch?v=17ZrLitIfRE";  //For Testing
+        return Console.ReadLine().Trim();
     }
 
     private void PromptForUrl()
@@ -139,28 +77,7 @@ public class YoutubeDownloaderApp
         Console.WriteLine("--------------------------------------");
     }
 
-    public void DownloadFile(string mediaType, YouTubeVideo video)
-    {
-        string filePath = GetFilePath(mediaType, video);
-        DeleteFile(filePath);
 
-        Console.WriteLine(Environment.NewLine + "Downloading...");
-
-        try
-        {
-            File.WriteAllBytes(filePath, video.GetBytes());
-
-            Console.WriteLine("FINISHED: ");
-            Console.WriteLine($"{filePath}");
-
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine("Error occured while download/writing the file");
-            Console.WriteLine(ex);
-        }
-        Exit();
-    }
 
     private static void Exit()
     {
@@ -193,95 +110,13 @@ public class YoutubeDownloaderApp
         Console.WriteLine("[A]udio");
     }
 
-    public static string GetMediaType()
-    {
-        return "A";
-        //string mediaType = Console.ReadKey();
-        //if (string.IsNullOrEmpty(mediaType))
-        //{
-        //    return "V";
-        //}
 
-        //return mediaType;
-    }
-
-    public YouTubeVideo SelectMediaOption(string link, List<YouTubeVideo> videos, string mediaType)
-    {
-        YouTubeVideo video = videos[0];
-        Console.WriteLine(video.Title);
-
-        if (mediaType.ToUpper() == "A")
-        {
-            return video;
-        }
-
-        if (videos.Count == 1)
-        {
-            string message = $"[{1}] Resolution {video.Resolution} , " + 
-                             $"Audio Bitrate {video.AudioBitrate} {video.AudioFormat}" +
-                             Environment.NewLine ;
-            Console.WriteLine(message);
-            return video;
-        }
-
-        PromptUserForTheResolution(videos);
-        var selectedVideo = ReadTheResolution(videos);
-
-        if (selectedVideo != null)
-        {
-            return selectedVideo;
-        }
-
-        return video;
-    }
-
-    private static void PromptUserForTheResolution(List<YouTubeVideo> videos)
-    {
-        Console.WriteLine($"Select a Resolution - Enter a number:");
-        int i = 1;
-        foreach (var vid in videos)
-        {
-            string defaultstring = i == 1 ? "(DEFAULT)" : "";
-            string message = $"[{i}] Resolution {vid.Resolution} , Audio Bitrate {vid.AudioBitrate} {vid.AudioFormat} {defaultstring}";
-            Console.WriteLine(message);
-            i++;
-        }
-    }
-
-    private static YouTubeVideo ReadTheResolution(List<YouTubeVideo> videos)
-    {
-        YouTubeVideo video = default;
-        string resolution = Console.ReadLine().Trim();
-        if (!string.IsNullOrEmpty(resolution))
-        {
-            video = videos[int.Parse(resolution) - 1];
-        }
-
-        return video;
-    }
-
-    public void DeleteFile(string path)
-    {
-        try
-        {
-            if (File.Exists(path))
-            {
-                File.Delete(path);
-            }
-        }
-        catch 
-        { 
-            Console.WriteLine("Error Deleting the existing File"); 
-        }
-    }
 
     private void DownloadSelectedOption(int option)
     {
         Console.WriteLine($"Downloading... {option}");
         _youtubeDownloader.DownloadMedia(option-1, OutputPath).Wait();
     }
-
-    
 
     private static void DisplayOptions(List<string> options)
     {
@@ -293,10 +128,40 @@ public class YoutubeDownloaderApp
         }
     }
 
-    private object GetOption()
+    private static int GetOption(List<string> options)
     {
-        throw new NotImplementedException();
+        int result;
+        while (true)
+        {
+            Console.Write($"Please enter an integer (1 to {options.Count}): ");
+            string input = Console.ReadLine();
+            if (int.TryParse(input, out result) && result >= 1 && result <= options.Count)
+            {
+                break;
+            }
+            else
+            {
+                Console.WriteLine("Invalid input. Returning default option 1.");
+                return 1;
+            }
+        }
+        return result;
     }
 
+    public static string GetMediaType()
+    {
+        char mediaType = Console.ReadKey().KeyChar;
+        Console.WriteLine();
+        mediaType = char.ToUpper(mediaType);
+
+        if (mediaType == 'V' || mediaType == 'A')
+        {
+            return mediaType.ToString();
+        }
+        else
+        {
+            return "V";
+        }
+    }
 }
 

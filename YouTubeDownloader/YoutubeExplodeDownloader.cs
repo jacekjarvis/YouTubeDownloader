@@ -54,7 +54,8 @@ public class YoutubeExplodeDownloader : IYoutubeDownloader
             var muxedStream = (MuxedStreamInfo)stream;
             return $"File Type: {muxedStream.Container} | " +
                    $"Video Quality: {muxedStream.VideoQuality} | " +
-                   $"Video Resolution: {muxedStream.VideoResolution} ";
+                   $"Video Resolution: {muxedStream.VideoResolution} | " +
+                   $"Size: {muxedStream.Size} ";
         });
         return result;
     }
