@@ -6,7 +6,8 @@ public class Program
 {
     public static void Main(string[] args)
     {
-        var downloader = new YouTubeDownloaderApp();
+        var youtubeDownloader = new YoutubeExplodeDownloader();
+        var downloader = new YoutubeDownloaderApp(youtubeDownloader);
         downloader.Run(); 
     }
 }

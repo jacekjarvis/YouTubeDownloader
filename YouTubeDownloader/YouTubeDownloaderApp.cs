@@ -11,33 +11,109 @@ using YoutubeExplode.Videos;
 using System.Net.Http;
 using System.Threading.Tasks;
 
-public class YouTubeDownloaderApp
+public class YoutubeDownloaderApp
 {
     private const string Version = "2024.06.04";
+    private readonly string OutputPath;
     private YouTube _youTube { get; }
     private YoutubeClient youtube {  get; }
 
-    public YouTubeDownloaderApp()
+    private IYoutubeDownloader _youtubeDownloader { get; }
+
+    public YoutubeDownloaderApp(IYoutubeDownloader youtubeDownloader)
     {
         _youTube = YouTube.Default;
         youtube = new YoutubeClient();
+        _youtubeDownloader = youtubeDownloader;
+        OutputPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
     }
 
     public void Run()
     {
         PrintAppTitle();
         PromptUserForYouTubeLink();
-        string videoUrl = ReadYouTubeUrl();
+        var videoUrl = EnterYouTubeUrl();
+        _youtubeDownloader.VideoUrl = videoUrl;
+
+        var title = _youtubeDownloader.GetVideoTitle();
+        Console.WriteLine(title);
 
         PromptUserForMediaType();
-        string mediaType = ReadMediaType();
+        var mediaType = SelectMediaType();
 
-        GetMediaAsync(videoUrl, mediaType).Wait();
+        DisplayOptions(mediaType);
+        var option = 1;  //SelectOption();
+
+        DownloadSelectedOption(option);
+
+        //GetMediaAsync(videoUrl, mediaType).Wait();
     }
+
+
 
     private async Task GetMediaAsync(string videoUrl, string mediaType)
     {
-        Console.WriteLine(Environment.NewLine + "Getting data...");
+
+
+        var video = youtube.Videos.GetAsync(videoUrl).Result;
+        var streamManifest = youtube.Videos.Streams.GetManifestAsync(videoUrl).Result;
+
+        //var streamInfo = streamManifest.GetMuxedStreams().GetWithHighestVideoQuality();
+
+        var muxedStreams = streamManifest.GetMuxedStreams().OrderByDescending(s => s.VideoQuality).ToList();
+
+        var sanitizedTitle = SanitizeTitle(video.Title);
+
+        //var stream = youtube.Videos.Streams.GetAsync(streamInfo).Result;
+
+
+
+        if (muxedStreams.Any())
+        {
+            var streamInfo = muxedStreams.First();
+            //using var httpClient = new HttpClient();
+            //var stream = httpClient.GetStreamAsync(streamInfo.Url).Result;
+
+            var outputFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                        $"{sanitizedTitle}.{streamInfo.Container}");
+
+            await youtube.Videos.Streams.DownloadAsync(streamInfo, outputFilePath);
+            //using var outputStream = File.Create(outputFilePath);
+            //await stream.CopyToAsync(outputStream);
+
+            var datetime = DateTime.Now;
+            Console.WriteLine("Download completed!");
+            Console.WriteLine($"Video saved as: {outputFilePath} {datetime}");
+        }
+        else
+        {
+            Console.WriteLine($"No suitable video stream found for {video.Title}.");
+        }
+
+
+        //youtube.Videos.Streams.DownloadAsync(streamInfo, $"video.{streamInfo.Container}");
+        //await youtube.Videos.Streams.DownloadAsync(streamInfo, path);
+
+        //if (mediaType.ToUpper() == "V")
+        //{
+        //    videos = videos.Where(vid => vid.Format == VideoFormat.Mp4 && vid.AudioBitrate > 0)
+        //                   .OrderByDescending(vid => vid.Resolution).ToList();
+        //}
+        //else
+        //{
+        //    YouTubeVideo v = videos.Where(r => r.AdaptiveKind == AdaptiveKind.Audio).FirstOrDefault();
+        //    videos.Clear();
+        //    videos.Add(v);
+        //}
+
+        //YouTubeVideo video = SelectMediaOption(videoUrl, videos, mediaType);
+        //DownloadFile(mediaType, video);
+        Console.WriteLine("Get Media End");
+    }
+
+    private async Task GetMediaAsync1(string videoUrl, string mediaType)
+    {
+        
         //List<YouTubeVideo> videos = _youTube.GetAllVideos(videoUrl).ToList();
 
         var video = youtube.Videos.GetAsync(videoUrl).Result;
@@ -46,6 +122,7 @@ public class YouTubeDownloaderApp
         //var streamInfo = streamManifest.GetMuxedStreams().GetWithHighestVideoQuality();
 
         var muxedStreams = streamManifest.GetMuxedStreams().OrderByDescending(s => s.VideoQuality).ToList();
+
         var sanitizedTitle = SanitizeTitle(video.Title);
 
         //var stream = youtube.Videos.Streams.GetAsync(streamInfo).Result;
@@ -95,7 +172,7 @@ public class YouTubeDownloaderApp
     Console.WriteLine("Get Media End");
     }
 
-    private string ReadYouTubeUrl()
+    private string EnterYouTubeUrl()
     {
         return @"https://www.youtube.com/watch?v=17ZrLitIfRE";  //For Testing
         //return Console.ReadLine().Trim();
@@ -179,7 +256,7 @@ public class YouTubeDownloaderApp
         Console.WriteLine("[A]udio");
     }
 
-    public string ReadMediaType()
+    public string SelectMediaType()
     {
         return "V";
         //string mediaType = Console.ReadLine().Trim();
@@ -261,7 +338,31 @@ public class YouTubeDownloaderApp
         }
     }
 
-    
-}
+    private void DownloadSelectedOption(int option)
+    {
+        _youtubeDownloader.DownloadVideoOption(option, OutputPath).Wait();
 
+    }
+
+    private object SelectOption()
+    {
+        throw new NotImplementedException();
+    }
+
+    private void DisplayOptions(string mediaType)
+    {
+        Console.WriteLine("Getting data...");
+        if (mediaType == "V")
+        {
+            var options = _youtubeDownloader.GetVideoOptions();
+            var i = 1;
+            foreach (var option in options)
+            {
+                Console.WriteLine($"[{i}] {option}");
+                i++;
+            }
+        }
+    }
+
+}
 
