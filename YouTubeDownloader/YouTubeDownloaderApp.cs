@@ -120,7 +120,7 @@ public class YoutubeDownloaderApp
 
     private void DownloadSelectedOption(int option)
     {
-        Console.WriteLine($"Downloading... {option}");
+        Console.WriteLine($"Downloading option: [{option}] ...");
         _youtubeDownloader.DownloadMedia(option-1, OutputPath).Wait();
     }
 
@@ -147,7 +147,6 @@ public class YoutubeDownloaderApp
             }
             else
             {
-                Console.WriteLine("Invalid input. Returning default option 1.");
                 return 1;
             }
         }
