@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 public class YoutubeDownloaderApp
 {
-    private const string Version = "2024.06.04";
+    private const string Version = "2024.06.19";
     private readonly string OutputPath;
     private YouTube _youTube { get; }
     private YoutubeClient youtube {  get; }
@@ -28,10 +28,7 @@ public class YoutubeDownloaderApp
         DisplayApplicationTitle();
         PromptForUrl();
         var videoUrl = GetUrl();
-        _youtubeDownloader.VideoUrl = videoUrl;
-
-        var videoTitle = _youtubeDownloader.GetVideoTitle();
-        Console.WriteLine(videoTitle);
+        GetAndDisplayTitle(videoUrl);
 
         PromptForMediaType();
         var mediaType = GetMediaType();
@@ -40,13 +37,22 @@ public class YoutubeDownloaderApp
         DisplayOptions(options);
 
         int option = 1;
-        if (options.Count > 1 )
+        if (options.Count > 1)
         {
             option = GetOption(options);
         }
 
         DownloadSelectedOption(option);
         Exit();
+    }
+
+    private void GetAndDisplayTitle(string videoUrl)
+    {
+        _youtubeDownloader.VideoUrl = videoUrl;
+
+        Console.WriteLine("Getting Data...");
+        var videoTitle = _youtubeDownloader.GetVideoTitle();
+        Console.WriteLine(videoTitle);
     }
 
     private List<string> GetMediaOptions(string mediaType)
