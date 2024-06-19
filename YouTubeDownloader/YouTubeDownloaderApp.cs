@@ -1,14 +1,9 @@
-﻿//using FFMpegCore; //Install-Package FFMpegCore //Install-Package Xabe.FFmpeg.Downloader
-
-using YoutubeExplode;
+﻿using YoutubeExplode;
 using VideoLibrary;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
-using YoutubeExplode.Videos.Streams;
-using YoutubeExplode.Videos;
-using System.Net.Http;
 using System.Threading.Tasks;
 
 public class YoutubeDownloaderApp
@@ -30,86 +25,41 @@ public class YoutubeDownloaderApp
 
     public void Run()
     {
-        PrintAppTitle();
-        PromptUserForYouTubeLink();
-        var videoUrl = EnterYouTubeUrl();
+        DisplayApplicationTitle();
+        PromptForUrl();
+        var videoUrl = GetUrl();
         _youtubeDownloader.VideoUrl = videoUrl;
 
-        var title = _youtubeDownloader.GetVideoTitle();
-        Console.WriteLine(title);
+        var videoTitle = _youtubeDownloader.GetVideoTitle();
+        Console.WriteLine(videoTitle);
 
-        PromptUserForMediaType();
-        var mediaType = SelectMediaType();
+        PromptForMediaType();
+        var mediaType = GetMediaType();
 
-        DisplayOptions(mediaType);
-        var option = 1;  //SelectOption();
+        var options = GetMediaOptions(mediaType);
+        DisplayOptions(options);
+
+        int option = 1;
+        if (options.Count > 1 )
+        {
+            //option = GetOption();
+        }
 
         DownloadSelectedOption(option);
-
-        //GetMediaAsync(videoUrl, mediaType).Wait();
+        Exit();
     }
 
-
-
-    private async Task GetMediaAsync(string videoUrl, string mediaType)
+    private List<string> GetMediaOptions(string mediaType)
     {
-
-
-        var video = youtube.Videos.GetAsync(videoUrl).Result;
-        var streamManifest = youtube.Videos.Streams.GetManifestAsync(videoUrl).Result;
-
-        //var streamInfo = streamManifest.GetMuxedStreams().GetWithHighestVideoQuality();
-
-        var muxedStreams = streamManifest.GetMuxedStreams().OrderByDescending(s => s.VideoQuality).ToList();
-
-        var sanitizedTitle = SanitizeTitle(video.Title);
-
-        //var stream = youtube.Videos.Streams.GetAsync(streamInfo).Result;
-
-
-
-        if (muxedStreams.Any())
+        Console.WriteLine("Getting Data...");
+        if (mediaType == "A") 
         {
-            var streamInfo = muxedStreams.First();
-            //using var httpClient = new HttpClient();
-            //var stream = httpClient.GetStreamAsync(streamInfo.Url).Result;
-
-            var outputFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
-                        $"{sanitizedTitle}.{streamInfo.Container}");
-
-            await youtube.Videos.Streams.DownloadAsync(streamInfo, outputFilePath);
-            //using var outputStream = File.Create(outputFilePath);
-            //await stream.CopyToAsync(outputStream);
-
-            var datetime = DateTime.Now;
-            Console.WriteLine("Download completed!");
-            Console.WriteLine($"Video saved as: {outputFilePath} {datetime}");
-        }
-        else
-        {
-            Console.WriteLine($"No suitable video stream found for {video.Title}.");
+            return _youtubeDownloader.GetAudioOptions().ToList();
         }
 
-
-        //youtube.Videos.Streams.DownloadAsync(streamInfo, $"video.{streamInfo.Container}");
-        //await youtube.Videos.Streams.DownloadAsync(streamInfo, path);
-
-        //if (mediaType.ToUpper() == "V")
-        //{
-        //    videos = videos.Where(vid => vid.Format == VideoFormat.Mp4 && vid.AudioBitrate > 0)
-        //                   .OrderByDescending(vid => vid.Resolution).ToList();
-        //}
-        //else
-        //{
-        //    YouTubeVideo v = videos.Where(r => r.AdaptiveKind == AdaptiveKind.Audio).FirstOrDefault();
-        //    videos.Clear();
-        //    videos.Add(v);
-        //}
-
-        //YouTubeVideo video = SelectMediaOption(videoUrl, videos, mediaType);
-        //DownloadFile(mediaType, video);
-        Console.WriteLine("Get Media End");
+        return _youtubeDownloader.GetVideoOptions().ToList();
     }
+
 
     private async Task GetMediaAsync1(string videoUrl, string mediaType)
     {
@@ -172,18 +122,18 @@ public class YoutubeDownloaderApp
     Console.WriteLine("Get Media End");
     }
 
-    private string EnterYouTubeUrl()
+    private string GetUrl()
     {
         return @"https://www.youtube.com/watch?v=17ZrLitIfRE";  //For Testing
         //return Console.ReadLine().Trim();
     }
 
-    private void PromptUserForYouTubeLink()
+    private void PromptForUrl()
     {
         Console.WriteLine("Enter your Youtube Link:");
     }
 
-    private void PrintAppTitle()
+    private void DisplayApplicationTitle()
     {
         Console.WriteLine($"JARVO'S YOUTUBE DOWNLOADER v{Version}");
         Console.WriteLine("--------------------------------------");
@@ -214,8 +164,8 @@ public class YoutubeDownloaderApp
 
     private static void Exit()
     {
-        Console.WriteLine("Press enter to exit");
-        Console.ReadLine();
+        Console.WriteLine("Press any key to exit");
+        Console.ReadKey();
     }
 
     private string GetFilePath(string mediaType, YouTubeVideo video)
@@ -231,35 +181,22 @@ public class YoutubeDownloaderApp
         return filePath;
     }
 
-    private  string SanitizeTitle(string fileName)
+    private static string SanitizeTitle(string fileName)
     {
-        //Ensure that the filename has Valid FileNameChars - so that we can save the file
-        //char[] invalidChars = Path.GetInvalidFileNameChars();
-
-        //foreach (char c in invalidChars)
-        //{
-        //    fileName = fileName.Replace(c.ToString(), "");
-        //}
-
-        //if (fileName.Length == 0)
-        //{
-        //    DateTime now = DateTime.Now;
-        //    return $"YouTube_{now.Year}-{now.Month}-{now.Day}";
-        //}
         return string.Join("_", fileName.Split(Path.GetInvalidFileNameChars()));
     }
 
-    public void PromptUserForMediaType()
+    public static void PromptForMediaType()
     {
         Console.WriteLine("Select a format - Enter V or A");
         Console.WriteLine("[V]ideo (DEFAULT)");
         Console.WriteLine("[A]udio");
     }
 
-    public string SelectMediaType()
+    public static string GetMediaType()
     {
-        return "V";
-        //string mediaType = Console.ReadLine().Trim();
+        return "A";
+        //string mediaType = Console.ReadKey();
         //if (string.IsNullOrEmpty(mediaType))
         //{
         //    return "V";
@@ -298,7 +235,7 @@ public class YoutubeDownloaderApp
         return video;
     }
 
-    private void PromptUserForTheResolution(List<YouTubeVideo> videos)
+    private static void PromptUserForTheResolution(List<YouTubeVideo> videos)
     {
         Console.WriteLine($"Select a Resolution - Enter a number:");
         int i = 1;
@@ -311,7 +248,7 @@ public class YoutubeDownloaderApp
         }
     }
 
-    private YouTubeVideo ReadTheResolution(List<YouTubeVideo> videos)
+    private static YouTubeVideo ReadTheResolution(List<YouTubeVideo> videos)
     {
         YouTubeVideo video = default;
         string resolution = Console.ReadLine().Trim();
@@ -340,28 +277,25 @@ public class YoutubeDownloaderApp
 
     private void DownloadSelectedOption(int option)
     {
-        _youtubeDownloader.DownloadMedia(option, OutputPath).Wait();
-
+        Console.WriteLine($"Downloading... {option}");
+        _youtubeDownloader.DownloadMedia(option-1, OutputPath).Wait();
     }
 
-    private object SelectOption()
+    
+
+    private static void DisplayOptions(List<string> options)
+    {
+        var i = 1;
+        foreach (var option in options)
+        {
+            Console.WriteLine($"[{i}] {option}");
+            i++;
+        }
+    }
+
+    private object GetOption()
     {
         throw new NotImplementedException();
-    }
-
-    private void DisplayOptions(string mediaType)
-    {
-        Console.WriteLine("Getting data...");
-        if (mediaType == "V")
-        {
-            var options = _youtubeDownloader.GetVideoOptions();
-            var i = 1;
-            foreach (var option in options)
-            {
-                Console.WriteLine($"[{i}] {option}");
-                i++;
-            }
-        }
     }
 
 }

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using VideoLibrary;
 using YoutubeExplode;
 using YoutubeExplode.Videos.Streams;
 using System.Linq;
@@ -46,14 +45,16 @@ public class YoutubeExplodeDownloader : IYoutubeDownloader
     public IEnumerable<string> GetVideoOptions()
     {
         var streamManifest = _youtube.Videos.Streams.GetManifestAsync(VideoUrl).Result;
-        _streams = streamManifest.GetMuxedStreams().OrderByDescending(stream => stream.VideoQuality).Select(stream => (IStreamInfo)stream).ToList();
+        _streams = streamManifest.GetMuxedStreams()
+            .OrderByDescending(stream => stream.VideoQuality)
+            .Select(stream => (IStreamInfo)stream).ToList();
 
         var result = _streams.Select(stream =>
         {
             var muxedStream = (MuxedStreamInfo)stream;
-            return  $"Video Quality: {muxedStream.VideoQuality} | " +
-                    $"Video Resolution: {muxedStream.VideoResolution} | " +
-                    $"File Type: {muxedStream.Container}";
+            return $"File Type: {muxedStream.Container} | " +
+                   $"Video Quality: {muxedStream.VideoQuality} | " +
+                   $"Video Resolution: {muxedStream.VideoResolution} ";
         });
         return result;
     }
@@ -61,12 +62,26 @@ public class YoutubeExplodeDownloader : IYoutubeDownloader
 
     public IEnumerable<string> GetAudioOptions()
     {
-        throw new NotImplementedException();
+        var streamManifest = _youtube.Videos.Streams.GetManifestAsync(VideoUrl).Result;
+        _streams = streamManifest.GetAudioOnlyStreams()
+            .OrderByDescending(stream => stream.AudioCodec)
+            .ThenBy(stream => stream.Bitrate)
+            .Select(stream => (IStreamInfo)stream).ToList();
+
+        var result = _streams.Select(stream =>
+        {
+            var audioStream = (AudioOnlyStreamInfo)stream;
+            return $"File Type: {audioStream.Container} | " +
+                   $"Audio Container: {audioStream.AudioCodec} | " +
+                   $"Bitrate: {audioStream.Bitrate} | " +
+                   $"Size: {audioStream.Size} ";
+        });
+        return result;
     }
 
     public async Task DownloadMedia(int option, string outputPath)
     {
-        var streamInfo = _streams[option - 1];
+        var streamInfo = _streams[option];
 
         var title = SanitizeText(CurrentTitle);
 
