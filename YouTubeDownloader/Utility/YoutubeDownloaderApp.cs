@@ -136,7 +136,7 @@ public class YoutubeDownloaderApp
 
     private static void Exit()
     {
-        Console.WriteLine("Press any key to exit");
+        Console.WriteLine("\nPress any key to exit");
         Console.ReadKey();
     }
 }

@@ -7,32 +7,18 @@ using System.Threading.Tasks;
 using System.IO;
 
 
-public interface IYoutubeDownloader
-{
-    public string VideoUrl { get; set; }
-    public string CurrentTitle { get; set; }
-    public IEnumerable<string> GetVideoOptions();
-    public IEnumerable<string> GetAudioOptions();
-
-    public Task DownloadMedia(int option, string outputPath);
-
-    public string GetVideoTitle();
-}
-
-
-
 public class YoutubeExplodeDownloader : IYoutubeDownloader
 {
-    private readonly YoutubeClient _youtube;
-    private List<IStreamInfo> _streams;
     public string VideoUrl { get; set; }
     public string CurrentTitle { get; set; }
+
+    private readonly YoutubeClient _youtube;
+    private List<IStreamInfo> _streams;
 
     public YoutubeExplodeDownloader()
     {
         _youtube = new YoutubeClient();
     }
-
 
     public string GetVideoTitle()
     {
@@ -40,7 +26,6 @@ public class YoutubeExplodeDownloader : IYoutubeDownloader
         CurrentTitle = video.Title;
         return video.Title;
     }
-
 
     public IEnumerable<string> GetVideoOptions()
     {
@@ -59,7 +44,6 @@ public class YoutubeExplodeDownloader : IYoutubeDownloader
         });
         return result;
     }
-
 
     public IEnumerable<string> GetAudioOptions()
     {
@@ -91,15 +75,12 @@ public class YoutubeExplodeDownloader : IYoutubeDownloader
 
 
         var datetime = DateTime.Now;
-        Console.WriteLine("Download completed!");
-        Console.WriteLine($"Video saved as: {outputFilePath} {datetime}");
+        Console.WriteLine($"Download completed: {datetime}");
+        Console.WriteLine($"Video saved as: {outputFilePath}");
 
     }
-
-    private string SanitizeText(string fileName)
+    private static string SanitizeText(string fileName)
     {
         return string.Join("_", fileName.Split(Path.GetInvalidFileNameChars()));
     }
-
-
 }
