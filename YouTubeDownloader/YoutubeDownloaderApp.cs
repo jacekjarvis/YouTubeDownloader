@@ -6,7 +6,7 @@ using System.Linq;
 
 public class YoutubeDownloaderApp
 {
-    private readonly string Version = "2024.06.19";
+    private readonly string Version = "2024.06.20";
     private readonly string OutputPath;
     private YoutubeClient _youtube {  get; }
     private IYoutubeDownloader _youtubeDownloader { get; }

@@ -10,7 +10,7 @@ using System.IO;
 public class YoutubeExplodeDownloader : IYoutubeDownloader
 {
     public string VideoUrl { get; set; }
-    public string CurrentTitle { get; set; }
+    private string _videoTitle { get; set; }
 
     private readonly YoutubeClient _youtube;
     private List<IStreamInfo> _streams;
@@ -23,7 +23,7 @@ public class YoutubeExplodeDownloader : IYoutubeDownloader
     public string GetVideoTitle()
     {
         var video = _youtube.Videos.GetAsync(VideoUrl).Result;
-        CurrentTitle = video.Title;
+        _videoTitle = video.Title;
         return video.Title;
     }
 
@@ -68,17 +68,21 @@ public class YoutubeExplodeDownloader : IYoutubeDownloader
     {
         var streamInfo = _streams[option];
 
-        var title = SanitizeText(CurrentTitle);
+        var title = _videoTitle;
+        if (string.IsNullOrEmpty(title))
+        {
+            title = GetVideoTitle();
+        }
+        title = SanitizeText(title);
 
         var outputFilePath = Path.Combine(outputPath, $"{title}.{streamInfo.Container}");
         await _youtube.Videos.Streams.DownloadAsync(streamInfo, outputFilePath);
 
-
         var datetime = DateTime.Now;
         Console.WriteLine($"Download completed: {datetime}");
         Console.WriteLine($"Video saved as: {outputFilePath}");
-
     }
+
     private static string SanitizeText(string fileName)
     {
         return string.Join("_", fileName.Split(Path.GetInvalidFileNameChars()));
