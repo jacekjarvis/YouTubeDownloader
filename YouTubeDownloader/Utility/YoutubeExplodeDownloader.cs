@@ -2,9 +2,12 @@
 using System.Collections.Generic;
 using YoutubeExplode;
 using YoutubeExplode.Videos.Streams;
+using YoutubeExplode.Converter; 
 using System.Linq;
 using System.Threading.Tasks;
 using System.IO;
+using VideoLibrary;
+//sing VideoLibrary;
 
 
 public class YoutubeExplodeDownloader : IYoutubeDownloader
@@ -27,20 +30,39 @@ public class YoutubeExplodeDownloader : IYoutubeDownloader
         return video.Title;
     }
 
+    //public IEnumerable<string> GetVideoOptions()
+    //{
+    //    var streamManifest = _youtube.Videos.Streams.GetManifestAsync(VideoUrl).Result;
+    //    _streams = streamManifest.GetMuxedStreams()
+    //        .OrderByDescending(stream => stream.VideoQuality)
+    //        .Select(stream => (IStreamInfo)stream).ToList();
+
+    //    var result = _streams.Select(stream =>
+    //    {
+    //        var muxedStream = (MuxedStreamInfo)stream;
+    //        return $"File Type: {muxedStream.Container} | " +
+    //               $"Video Quality: {muxedStream.VideoQuality} | " +
+    //               $"Video Resolution: {muxedStream.VideoResolution} | " +
+    //               $"Size: {muxedStream.Size} ";
+    //    });
+    //    return result;
+    //}
+
     public IEnumerable<string> GetVideoOptions()
     {
         var streamManifest = _youtube.Videos.Streams.GetManifestAsync(VideoUrl).Result;
-        _streams = streamManifest.GetMuxedStreams()
+        _streams = streamManifest.GetVideoOnlyStreams()
+            .Where(s => s.Container == Container.Mp4)
             .OrderByDescending(stream => stream.VideoQuality)
             .Select(stream => (IStreamInfo)stream).ToList();
 
         var result = _streams.Select(stream =>
         {
-            var muxedStream = (MuxedStreamInfo)stream;
-            return $"File Type: {muxedStream.Container} | " +
-                   $"Video Quality: {muxedStream.VideoQuality} | " +
-                   $"Video Resolution: {muxedStream.VideoResolution} | " +
-                   $"Size: {muxedStream.Size} ";
+            var videoStream = (VideoOnlyStreamInfo)stream;
+            return $"File Type: {videoStream.Container} | " +
+                   $"Video Quality: {videoStream.VideoQuality} | " +
+                   $"Video Resolution: {videoStream.VideoResolution} | " +
+                   $"Size: {videoStream.Size} ";
         });
         return result;
     }
@@ -49,8 +71,8 @@ public class YoutubeExplodeDownloader : IYoutubeDownloader
     {
         var streamManifest = _youtube.Videos.Streams.GetManifestAsync(VideoUrl).Result;
         _streams = streamManifest.GetAudioOnlyStreams()
-            .OrderByDescending(stream => stream.AudioCodec)
-            .ThenBy(stream => stream.Bitrate)
+            .OrderBy(stream => stream.AudioCodec)
+            .ThenByDescending(stream => stream.Bitrate)
             .Select(stream => (IStreamInfo)stream).ToList();
 
         var result = _streams.Select(stream =>
@@ -64,7 +86,7 @@ public class YoutubeExplodeDownloader : IYoutubeDownloader
         return result;
     }
 
-    public async Task DownloadMedia(int option, string outputPath)
+    public async Task DownloadMedia(char mediaType, int option, string outputPath)
     {
         var streamInfo = _streams[option];
 
@@ -75,12 +97,26 @@ public class YoutubeExplodeDownloader : IYoutubeDownloader
         }
         title = SanitizeText(title);
 
-        var outputFilePath = Path.Combine(outputPath, $"{title}.{streamInfo.Container}");
-        await _youtube.Videos.Streams.DownloadAsync(streamInfo, outputFilePath);
+        var fileType = $"{streamInfo.Container}";
+        var outputFilePath = Path.Combine(outputPath, $"{title}");
+
+        if (mediaType == 'A')
+        {
+            await _youtube.Videos.Streams.DownloadAsync(streamInfo, $"{outputFilePath}.{fileType}");
+        }
+        else
+        {
+            var streamManifest = _youtube.Videos.Streams.GetManifestAsync(VideoUrl).Result;
+            var audioStreamInfo = streamManifest.GetAudioOnlyStreams().GetWithHighestBitrate();
+
+            var streamInfos = new IStreamInfo[] { audioStreamInfo, streamInfo };
+            await _youtube.Videos.DownloadAsync(streamInfos, new ConversionRequestBuilder($"{outputFilePath}.{fileType}").Build());
+
+        }
 
         var datetime = DateTime.Now;
         Console.WriteLine($"Download completed: {datetime}");
-        Console.WriteLine($"Video saved as: {outputFilePath}");
+        Console.WriteLine($"Video saved as: {outputFilePath}.{fileType}");
     }
 
     private static string SanitizeText(string fileName)

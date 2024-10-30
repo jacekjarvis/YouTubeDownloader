@@ -8,6 +8,6 @@ public interface IYoutubeDownloader
     public string GetVideoTitle();
     public IEnumerable<string> GetVideoOptions();
     public IEnumerable<string> GetAudioOptions();
-    public Task DownloadMedia(int option, string outputPath);
+    public Task DownloadMedia(char mediaType, int option, string outputPath);
     
 }

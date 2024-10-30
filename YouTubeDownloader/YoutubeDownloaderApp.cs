@@ -6,7 +6,7 @@ using System.Linq;
 
 public class YoutubeDownloaderApp
 {
-    private readonly string Version = "2024.06.20";
+    private readonly string Version = "2024.10.29";
     private readonly string OutputPath;
     private YoutubeClient _youtube {  get; }
     private IYoutubeDownloader _youtubeDownloader { get; }
@@ -32,7 +32,7 @@ public class YoutubeDownloaderApp
 
         DisplayOptions(options);
         var option = GetOption(options); 
-        DownloadSelectedOption(option);
+        DownloadSelectedOption(option, mediaType);
 
         Exit();
     }
@@ -67,7 +67,7 @@ public class YoutubeDownloaderApp
         Console.WriteLine("[A]udio");
     }
 
-    private static string GetMediaType()
+    private static char GetMediaType()
     {
         char mediaType = Console.ReadKey().KeyChar;
         Console.WriteLine();
@@ -75,18 +75,18 @@ public class YoutubeDownloaderApp
 
         if (mediaType == 'V' || mediaType == 'A')
         {
-            return mediaType.ToString();
+            return mediaType;
         }
         else
         {
-            return "V";
+            return 'V';
         }
     }
 
-    private List<string> GetMediaOptions(string mediaType)
+    private List<string> GetMediaOptions(char mediaType)
     {
         Console.WriteLine("Getting Data...");
-        if (mediaType == "A") 
+        if (mediaType == 'A') 
         {
             return _youtubeDownloader.GetAudioOptions().ToList();
         }
@@ -128,10 +128,10 @@ public class YoutubeDownloaderApp
         return selectedOption;
     }
 
-    private void DownloadSelectedOption(int option)
+    private void DownloadSelectedOption(int option, char mediaType)
     {
         Console.WriteLine($"Downloading option: [{option}] ...");
-        _youtubeDownloader.DownloadMedia(option-1, OutputPath).Wait();
+        _youtubeDownloader.DownloadMedia(mediaType, option-1, OutputPath).Wait();
     }
 
     private static void Exit()
