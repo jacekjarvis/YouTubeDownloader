@@ -6,7 +6,7 @@ using System.Linq;
 
 public class YoutubeDownloaderApp
 {
-    private readonly string Version = "2024.10.29";
+    private readonly string Version = "2024.10.31";
     private readonly string OutputPath;
     private YoutubeClient _youtube {  get; }
     private IYoutubeDownloader _youtubeDownloader { get; }
@@ -131,7 +131,7 @@ public class YoutubeDownloaderApp
     private void DownloadSelectedOption(int option, char mediaType)
     {
         Console.WriteLine($"Downloading option: [{option}] ...");
-        _youtubeDownloader.DownloadMedia(mediaType, option-1, OutputPath).Wait();
+        _youtubeDownloader.DownloadMedia((option-1), OutputPath).Wait();
     }
 
     private static void Exit()

@@ -6,8 +6,7 @@ using YoutubeExplode.Converter;
 using System.Linq;
 using System.Threading.Tasks;
 using System.IO;
-using VideoLibrary;
-//sing VideoLibrary;
+
 
 
 public class YoutubeExplodeDownloader : IYoutubeDownloader
@@ -30,23 +29,6 @@ public class YoutubeExplodeDownloader : IYoutubeDownloader
         return video.Title;
     }
 
-    //public IEnumerable<string> GetVideoOptions()
-    //{
-    //    var streamManifest = _youtube.Videos.Streams.GetManifestAsync(VideoUrl).Result;
-    //    _streams = streamManifest.GetMuxedStreams()
-    //        .OrderByDescending(stream => stream.VideoQuality)
-    //        .Select(stream => (IStreamInfo)stream).ToList();
-
-    //    var result = _streams.Select(stream =>
-    //    {
-    //        var muxedStream = (MuxedStreamInfo)stream;
-    //        return $"File Type: {muxedStream.Container} | " +
-    //               $"Video Quality: {muxedStream.VideoQuality} | " +
-    //               $"Video Resolution: {muxedStream.VideoResolution} | " +
-    //               $"Size: {muxedStream.Size} ";
-    //    });
-    //    return result;
-    //}
 
     public IEnumerable<string> GetVideoOptions()
     {
@@ -86,7 +68,7 @@ public class YoutubeExplodeDownloader : IYoutubeDownloader
         return result;
     }
 
-    public async Task DownloadMedia(char mediaType, int option, string outputPath)
+    public async Task DownloadMedia(int option, string outputPath)
     {
         var streamInfo = _streams[option];
 
@@ -100,7 +82,7 @@ public class YoutubeExplodeDownloader : IYoutubeDownloader
         var fileType = $"{streamInfo.Container}";
         var outputFilePath = Path.Combine(outputPath, $"{title}");
 
-        if (mediaType == 'A')
+        if (streamInfo is AudioOnlyStreamInfo)
         {
             await _youtube.Videos.Streams.DownloadAsync(streamInfo, $"{outputFilePath}.{fileType}");
         }
