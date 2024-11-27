@@ -1,4 +1,5 @@
-﻿using System;
+﻿
+using System;
 using System.Collections.Generic;
 using YoutubeExplode;
 using YoutubeExplode.Videos.Streams;
@@ -6,6 +7,7 @@ using YoutubeExplode.Converter;
 using System.Linq;
 using System.Threading.Tasks;
 using System.IO;
+using YouTubeDownloader.Utility;
 
 
 
@@ -85,6 +87,12 @@ public class YoutubeExplodeDownloader : IYoutubeDownloader
         if (streamInfo is AudioOnlyStreamInfo)
         {
             await _youtube.Videos.Streams.DownloadAsync(streamInfo, $"{outputFilePath}.{fileType}");
+            var mp3Converter = new MP3Converter();
+            if (mp3Converter.Convert(outputFilePath, fileType))
+            {
+                fileType = "mp3";
+            }
+
         }
         else
         {
@@ -98,8 +106,10 @@ public class YoutubeExplodeDownloader : IYoutubeDownloader
 
         var datetime = DateTime.Now;
         Console.WriteLine($"Download completed: {datetime}");
-        Console.WriteLine($"Video saved as: {outputFilePath}.{fileType}");
+        Console.WriteLine($"File saved as: {outputFilePath}.{fileType}");
     }
+
+
 
     private static string SanitizeText(string fileName)
     {
