@@ -91,7 +91,7 @@ public class YoutubeExplodeDownloader : IYoutubeDownloader
 
         var fileType = $"{streamInfo.Container}";
         var outputFilePath = Path.Combine(outputPath, $"{title}");
-        var ffmpegPath = Path.Combine(AppContext.BaseDirectory, "Utility", "ffmpeg");
+        var ffmpegPath = Path.Combine(AppContext.BaseDirectory, "ffmpeg");
 
         if (streamInfo is AudioOnlyStreamInfo)
         {
