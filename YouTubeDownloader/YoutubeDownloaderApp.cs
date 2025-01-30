@@ -6,14 +6,12 @@ using System.Linq;
 
 public class YoutubeDownloaderApp
 {
-    private readonly string Version = "2024.11.27";
+    private readonly string Version = "2025.01.29";
     private readonly string OutputPath;
-    private YoutubeClient _youtube {  get; }
     private IYoutubeDownloader _youtubeDownloader { get; }
 
     public YoutubeDownloaderApp(IYoutubeDownloader youtubeDownloader)
     {
-        _youtube = new YoutubeClient();
         _youtubeDownloader = youtubeDownloader;
         OutputPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
     }

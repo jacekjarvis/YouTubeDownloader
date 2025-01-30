@@ -55,9 +55,17 @@ public class YoutubeExplodeDownloader : IYoutubeDownloader
     {
         var streamManifest = _youtube.Videos.Streams.GetManifestAsync(VideoUrl).Result;
         _streams = streamManifest.GetAudioOnlyStreams()
-            .OrderBy(stream => stream.AudioCodec)
-            .ThenByDescending(stream => stream.Bitrate)
+            .Where(stream => stream.Container.ToString() == "mp4")
+            .OrderByDescending(stream => stream.Bitrate)
             .Select(stream => (IStreamInfo)stream).ToList();
+
+        if (_streams == null)
+        {
+            _streams = streamManifest.GetAudioOnlyStreams()
+                .OrderBy(stream => stream.AudioCodec)
+                .ThenByDescending(stream => stream.Bitrate)
+                .Select(stream => (IStreamInfo)stream).ToList();
+        }
 
         var result = _streams.Select(stream =>
         {
