@@ -6,6 +6,11 @@ namespace YouTubeDownloader.Utility;
 
 public class MP3Converter
 {
+    public MP3Converter(string ffmpegPath)
+    {
+        GlobalFFOptions.Configure(options => options.BinaryFolder = ffmpegPath);
+    }
+
     public bool Convert(string source, string fileType)
     {
         try
