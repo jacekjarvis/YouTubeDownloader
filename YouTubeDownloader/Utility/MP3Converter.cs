@@ -2,7 +2,7 @@
 using System;
 using System.IO;
 
-namespace YouTubeDownloader.Utility; 
+namespace YouTubeDownloader.Utility;
 
 public class MP3Converter
 {
@@ -15,13 +15,14 @@ public class MP3Converter
     {
         try
         {
+            Console.WriteLine($"Converting file to mp3...");
             FFMpeg.ExtractAudio($"{source}.{fileType}", $"{source}.mp3");
             File.Delete($"{source}.{fileType}");
             return true;
         }
-        catch
+        catch (Exception ex)
         {
-            Console.WriteLine($"Error occured when converting file to mp3");
+            Console.WriteLine($"Error occured when converting file to mp3: {ex.Message}");
         }
         return false;
     }
