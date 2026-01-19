@@ -1,12 +1,6 @@
-﻿using YoutubeExplode;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-
-
-public class YoutubeDownloaderApp
+﻿public class YoutubeDownloaderApp
 {
-    private readonly string Version = "2025.01.29";
+    private readonly string Version = "2026.01.19";
     private readonly string OutputPath;
     private IYoutubeDownloader _youtubeDownloader { get; }
 
@@ -19,7 +13,7 @@ public class YoutubeDownloaderApp
     public void Run()
     {
         DisplayApplicationTitle();
-       
+
         PromptForUrl();
         var videoUrl = GetUrl();
         GetAndDisplayTitle(videoUrl);
@@ -29,7 +23,7 @@ public class YoutubeDownloaderApp
         var options = GetMediaOptions(mediaType);
 
         DisplayOptions(options);
-        var option = GetOption(options); 
+        var option = GetOption(options);
         DownloadSelectedOption(option, mediaType);
 
         Exit();
@@ -84,7 +78,7 @@ public class YoutubeDownloaderApp
     private List<string> GetMediaOptions(char mediaType)
     {
         Console.WriteLine("Getting Data...");
-        if (mediaType == 'A') 
+        if (mediaType == 'A')
         {
             return _youtubeDownloader.GetAudioOptions().ToList();
         }
@@ -129,7 +123,7 @@ public class YoutubeDownloaderApp
     private void DownloadSelectedOption(int option, char mediaType)
     {
         Console.WriteLine($"Downloading option: [{option}] ...");
-        _youtubeDownloader.DownloadMedia((option-1), OutputPath).Wait();
+        _youtubeDownloader.DownloadMedia((option - 1), OutputPath).Wait();
     }
 
     private static void Exit()
