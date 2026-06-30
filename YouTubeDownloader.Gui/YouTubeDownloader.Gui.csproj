@@ -28,9 +28,17 @@
     <ProjectReference Include="..\YouTubeDownloader.Core\YouTubeDownloader.Core.csproj" />
   </ItemGroup>
 
+  <!-- ffmpeg.exe is needed at runtime for mp3 conversion and video muxing. -->
   <ItemGroup>
     <None Include="..\YouTubeDownloader\ffmpeg\ffmpeg.exe" Link="ffmpeg\ffmpeg.exe">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+
+  <!-- Linked content isn't reliably carried into single-file publish, so copy it explicitly. -->
+  <Target Name="CopyFfmpegToPublish" AfterTargets="Publish">
+    <Copy SourceFiles="..\YouTubeDownloader\ffmpeg\ffmpeg.exe"
+          DestinationFiles="$(PublishDir)ffmpeg\ffmpeg.exe"
+          SkipUnchangedFiles="true" />
+  </Target>
 </Project>
