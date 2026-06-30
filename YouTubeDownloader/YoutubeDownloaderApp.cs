@@ -1,129 +1,103 @@
-﻿public class YoutubeDownloaderApp
+using YouTubeDownloader.Core;
+
+public class YoutubeDownloaderApp
 {
-    private readonly string Version = "2026.01.19";
-    private readonly string OutputPath;
-    private IYoutubeDownloader _youtubeDownloader { get; }
+    private const string Version = "2026.06.30";
+    private readonly IYoutubeService _service;
+    private readonly string _outputPath;
 
-    public YoutubeDownloaderApp(IYoutubeDownloader youtubeDownloader)
+    public YoutubeDownloaderApp(IYoutubeService service)
     {
-        _youtubeDownloader = youtubeDownloader;
-        OutputPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+        _service = service;
+        _outputPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
     }
 
-    public void Run()
-    {
-        DisplayApplicationTitle();
-
-        PromptForUrl();
-        var videoUrl = GetUrl();
-        GetAndDisplayTitle(videoUrl);
-
-        PromptForMediaType();
-        var mediaType = GetMediaType();
-        var options = GetMediaOptions(mediaType);
-
-        DisplayOptions(options);
-        var option = GetOption(options);
-        DownloadSelectedOption(option, mediaType);
-
-        Exit();
-    }
-    private void DisplayApplicationTitle()
+    public async Task RunAsync()
     {
         Console.WriteLine($"JARVO'S YOUTUBE DOWNLOADER v{Version}");
         Console.WriteLine("--------------------------------------");
-    }
-    private void PromptForUrl()
-    {
-        Console.WriteLine("Enter your Youtube Link:");
-    }
-    private string GetUrl()
-    {
-        //return @"https://www.youtube.com/watch?v=17ZrLitIfRE";  //For Testing
-        return Console.ReadLine().Trim();
+
+        Console.WriteLine("Enter your YouTube link (video or playlist):");
+        var url = Console.ReadLine()?.Trim() ?? string.Empty;
+
+        Console.WriteLine("Getting data...");
+        ResolvedUrl resolved;
+        try
+        {
+            resolved = await _service.ResolveAsync(url);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+            Exit();
+            return;
+        }
+
+        if (resolved.IsPlaylist)
+            Console.WriteLine($"Playlist: {resolved.Title}  ({resolved.Videos.Count} videos)");
+        else
+            Console.WriteLine(resolved.Title);
+
+        var kind = PromptForMediaType();
+
+        Console.WriteLine("Getting quality options...");
+        var options = await _service.GetStreamOptionsAsync(resolved.Videos[0].Url, kind);
+        var option = PromptForOption(options);
+
+        var index = 1;
+        foreach (var video in resolved.Videos)
+        {
+            Console.WriteLine($"\n[{index}/{resolved.Videos.Count}] {video.Title}");
+            var progress = new Progress<double>(RenderProgressBar);
+            try
+            {
+                var path = await _service.DownloadAsync(video, kind, option, _outputPath, progress);
+                Console.WriteLine($"\nSaved: {path}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"\nFailed: {ex.Message}");
+            }
+            index++;
+        }
+
+        Console.WriteLine($"\nDownload completed: {DateTime.Now}");
+        Exit();
     }
 
-    private void GetAndDisplayTitle(string videoUrl)
-    {
-        _youtubeDownloader.VideoUrl = videoUrl;
-
-        Console.WriteLine("Getting Data...");
-        var videoTitle = _youtubeDownloader.GetVideoTitle();
-        Console.WriteLine(videoTitle);
-    }
-
-    private static void PromptForMediaType()
+    private static MediaKind PromptForMediaType()
     {
         Console.WriteLine("Select a format - Enter V or A");
         Console.WriteLine("[V]ideo (DEFAULT)");
         Console.WriteLine("[A]udio");
-    }
 
-    private static char GetMediaType()
-    {
-        char mediaType = Console.ReadKey().KeyChar;
+        var key = char.ToUpper(Console.ReadKey().KeyChar);
         Console.WriteLine();
-        mediaType = char.ToUpper(mediaType);
-
-        if (mediaType == 'V' || mediaType == 'A')
-        {
-            return mediaType;
-        }
-        else
-        {
-            return 'V';
-        }
+        return key == 'A' ? MediaKind.Audio : MediaKind.Video;
     }
 
-    private List<string> GetMediaOptions(char mediaType)
+    private static StreamOption PromptForOption(IReadOnlyList<StreamOption> options)
     {
-        Console.WriteLine("Getting Data...");
-        if (mediaType == 'A')
-        {
-            return _youtubeDownloader.GetAudioOptions().ToList();
-        }
+        for (var i = 0; i < options.Count; i++)
+            Console.WriteLine($"[{i + 1}] {options[i].Label}");
 
-        return _youtubeDownloader.GetVideoOptions().ToList();
-    }
-
-    private static void DisplayOptions(List<string> options)
-    {
-        var i = 1;
-        foreach (var option in options)
-        {
-            Console.WriteLine($"[{i}] {option}");
-            i++;
-        }
-    }
-
-    private static int GetOption(List<string> options)
-    {
         if (options.Count == 1)
-        {
-            return 1;
-        }
+            return options[0];
 
-        int selectedOption;
-        while (true)
-        {
-            Console.Write($"Please enter an integer (1 to {options.Count}): ");
-            string input = Console.ReadLine();
-            if (int.TryParse(input, out selectedOption) && selectedOption >= 1 && selectedOption <= options.Count)
-            {
-                break;
-            }
-            else
-            {
-                return 1;
-            }
-        }
-        return selectedOption;
+        Console.Write($"Please enter an integer (1 to {options.Count}): ");
+        var input = Console.ReadLine();
+        if (int.TryParse(input, out var selected) && selected >= 1 && selected <= options.Count)
+            return options[selected - 1];
+
+        return options[0];
     }
 
-    private void DownloadSelectedOption(int option, char mediaType)
+    private static void RenderProgressBar(double fraction)
     {
-        Console.WriteLine($"Downloading option: [{option}] ...");
-        _youtubeDownloader.DownloadMedia((option - 1), OutputPath).Wait();
+        const int width = 30;
+        var filled = (int)(fraction * width);
+        var bar = new string('#', filled) + new string('-', width - filled);
+        Console.Write($"\r[{bar}] {fraction:P0}");
     }
 
     private static void Exit()

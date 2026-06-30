@@ -1,13 +1,10 @@
-﻿//using FFMpegCore; //Install-Package FFMpegCore //Install-Package Xabe.FFmpeg.Downloader
-//using Xabe.FFmpeg;
-//using Xabe.FFmpeg.Downloader;
+using YouTubeDownloader.Core;
 
 public class Program
 {
-    public static void Main(string[] args)
+    public static async Task Main()
     {
-        var youtubeDownloader = new YoutubeExplodeDownloader();
-        var downloader = new YoutubeDownloaderApp(youtubeDownloader);
-        downloader.Run(); 
+        var app = new YoutubeDownloaderApp(new YoutubeService());
+        await app.RunAsync();
     }
 }
