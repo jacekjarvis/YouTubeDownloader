@@ -12,6 +12,9 @@ public partial class VideoItemViewModel : ObservableObject
     [ObservableProperty] private double _progress;
     [ObservableProperty] private string _status = "Queued";
 
+    /// <summary>False while a download is running, so the row's checkbox can't be toggled mid-download.</summary>
+    [ObservableProperty] private bool _controlsEnabled = true;
+
     public VideoItemViewModel(VideoEntry entry)
     {
         Entry = entry;

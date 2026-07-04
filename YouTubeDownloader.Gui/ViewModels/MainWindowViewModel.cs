@@ -14,6 +14,9 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly IYoutubeService _service;
     private CancellationTokenSource? _cts;
 
+    /// <summary>Raised (on the UI thread) when a download run ends, so the view can show a completion dialog.</summary>
+    public event Action<DownloadCompletedInfo>? DownloadCompleted;
+
     public MainWindowViewModel() : this(new YoutubeService()) { }
 
     public MainWindowViewModel(IYoutubeService service)
@@ -132,12 +135,14 @@ public partial class MainWindowViewModel : ViewModelBase
         var total = selected.Count;
         var completed = 0;
         var succeeded = 0;
+        var cancelled = false;
 
-        // Reset state for everything in the list.
+        // Reset state for everything in the list and lock the rows for the run.
         foreach (var v in Videos)
         {
             v.Progress = 0;
             v.Status = v.IsSelected ? "Queued" : "Skipped";
+            v.ControlsEnabled = false;
         }
 
         try
@@ -147,9 +152,14 @@ public partial class MainWindowViewModel : ViewModelBase
                 _cts.Token.ThrowIfCancellationRequested();
 
                 var done = completed; // capture for the progress closure
+                // Guard against late Progress<double> callbacks: Report() posts to the UI thread
+                // asynchronously, so a stale mid-download value can otherwise arrive *after* we mark
+                // the row done and revert the bar to ~95% / "Converting to MP3…".
+                var itemFinished = false;
                 item.Status = "Downloading…";
                 var progress = new Progress<double>(p =>
                 {
+                    if (itemFinished) return;
                     item.Progress = p;
                     OverallProgress = (done + p) / total;
                     if (kind == MediaKind.Audio && p >= 0.95 && p < 1.0)
@@ -164,16 +174,19 @@ public partial class MainWindowViewModel : ViewModelBase
 
                     await _service.DownloadAsync(item.Entry, kind, quality, OutputDirectory, progress, _cts.Token);
 
+                    itemFinished = true;
                     item.Progress = 1;
                     item.Status = "Done ✓";
                     succeeded++;
                 }
                 catch (OperationCanceledException)
                 {
+                    itemFinished = true;
                     throw;
                 }
                 catch (Exception ex)
                 {
+                    itemFinished = true;
                     item.Status = $"Failed: {ex.Message}";
                 }
 
@@ -185,6 +198,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
         catch (OperationCanceledException)
         {
+            cancelled = true;
             foreach (var item in selected.Where(i => i.Status is "Queued" or "Downloading…"))
                 item.Status = "Cancelled";
             Status = $"Cancelled — {succeeded} of {total} completed before stopping.";
@@ -192,11 +206,22 @@ public partial class MainWindowViewModel : ViewModelBase
         finally
         {
             IsBusy = false;
+            foreach (var v in Videos)
+                v.ControlsEnabled = true;
             _cts.Dispose();
             _cts = null;
+
+            var title = cancelled ? "Download cancelled" : "Download complete";
+            var message = cancelled
+                ? $"Stopped after {succeeded} of {total}.\nFiles saved so far are in the folder below."
+                : $"{succeeded} of {total} downloaded successfully.";
+            DownloadCompleted?.Invoke(new DownloadCompletedInfo(title, message, OutputDirectory));
         }
     }
 
     [RelayCommand]
     private void Cancel() => _cts?.Cancel();
 }
+
+/// <summary>Payload for the completion dialog the view shows when a download run ends.</summary>
+public record DownloadCompletedInfo(string Title, string Message, string Directory);
