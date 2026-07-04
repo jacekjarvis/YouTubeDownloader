@@ -206,6 +206,7 @@ public partial class MainWindowViewModel : ViewModelBase
         finally
         {
             IsBusy = false;
+            Url = string.Empty; // clear the address box now the run is finished
             foreach (var v in Videos)
                 v.ControlsEnabled = true;
             _cts.Dispose();
