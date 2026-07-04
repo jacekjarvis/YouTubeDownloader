@@ -5,6 +5,9 @@
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <!-- Icon shown for the .exe in Explorer and for desktop/taskbar shortcuts. -->
+    <ApplicationIcon>Icon.ico</ApplicationIcon>
+    <AssemblyName>JarvoYTDownloader</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
@@ -28,17 +31,13 @@
     <ProjectReference Include="..\YouTubeDownloader.Core\YouTubeDownloader.Core.csproj" />
   </ItemGroup>
 
-  <!-- ffmpeg.exe is needed at runtime for mp3 conversion and video muxing. -->
+  <!-- ffmpeg.exe is needed at runtime for mp3 conversion and video muxing. Copy it into both the
+       build output and the publish output; with IncludeAllContentForSelfExtract it gets bundled
+       inside the single-file exe and extracted next to it at runtime. -->
   <ItemGroup>
     <None Include="..\YouTubeDownloader\ffmpeg\ffmpeg.exe" Link="ffmpeg\ffmpeg.exe">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </None>
   </ItemGroup>
-
-  <!-- Linked content isn't reliably carried into single-file publish, so copy it explicitly. -->
-  <Target Name="CopyFfmpegToPublish" AfterTargets="Publish">
-    <Copy SourceFiles="..\YouTubeDownloader\ffmpeg\ffmpeg.exe"
-          DestinationFiles="$(PublishDir)ffmpeg\ffmpeg.exe"
-          SkipUnchangedFiles="true" />
-  </Target>
 </Project>

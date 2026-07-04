@@ -18,9 +18,20 @@ dotnet run --project YouTubeDownloader
 
 # Publish the console app as a self-contained single-file exe (win-x64)
 dotnet publish YouTubeDownloader/YouTubeDownloader.csproj -c Release
+
+# Publish the GUI as ONE portable, self-contained exe (win-x64) with ffmpeg bundled inside.
+# Output: YouTubeDownloader.Gui/bin/Release/net10.0/win-x64/publish/JarvoYTDownloader.exe
+# Runs on any Windows PC with no .NET install; the logo (Icon.ico) is the exe/desktop icon.
+dotnet publish YouTubeDownloader.Gui/YouTubeDownloader.Gui.csproj -c Release -r win-x64 \
+  --self-contained true -p:PublishSingleFile=true -p:IncludeAllContentForSelfExtract=true \
+  -p:EnableCompressionInSingleFile=true -p:DebugType=none
 ```
 
 There is currently **no test project** in this repo.
+
+The app icon lives at repo root as `Icon.png`; `YouTubeDownloader.Gui/Assets/Icon.png` is the
+in-app copy (window + header) and `YouTubeDownloader.Gui/Icon.ico` (generated from it) is the
+`<ApplicationIcon>` embedded in the exe.
 
 ## Architecture
 
