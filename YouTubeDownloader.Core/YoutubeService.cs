@@ -113,46 +113,66 @@ public class YoutubeService : IYoutubeService
         IProgress<double>? progress = null,
         CancellationToken ct = default)
     {
+        if (kind == MediaKind.Audio)
+        {
+            // Reserve the last slice of the bar for the (progress-less) mp3 conversion.
+            var scaled = progress is null ? null : new Progress<double>(p => progress.Report(p * 0.95));
+            var containerPath = await DownloadAudioContainerAsync(video, option, outputDirectory, scaled, ct);
+            var finalPath = ConvertToMp3(containerPath);
+            progress?.Report(1.0);
+            return finalPath;
+        }
+
         Directory.CreateDirectory(outputDirectory);
         var manifest = await _youtube.Videos.Streams.GetManifestAsync(video.Url, ct);
         var title = SanitizeText(video.Title);
         var outputFileBase = Path.Combine(outputDirectory, title);
 
-        if (kind == MediaKind.Audio)
-        {
-            var audio = PickAudio(manifest, option);
-            var container = audio.Container.Name;
-            var downloadedPath = $"{outputFileBase}.{container}";
+        var videoStream = PickVideo(manifest, option);
+        var audioStream = manifest.GetAudioOnlyStreams().GetWithHighestBitrate();
+        var mp4Path = $"{outputFileBase}.mp4";
+        var ffmpegExe = Path.Combine(_ffmpegDirectory, "ffmpeg.exe");
 
-            // Reserve the last slice of the bar for the (progress-less) mp3 conversion.
-            var scaled = progress is null ? null : new Progress<double>(p => progress.Report(p * 0.95));
-            await _youtube.Videos.Streams.DownloadAsync(audio, downloadedPath, scaled, ct);
+        var request = new ConversionRequestBuilder(mp4Path)
+            .SetFFmpegPath(ffmpegExe)
+            .Build();
 
-            var converter = new MP3Converter(_ffmpegDirectory);
-            var finalPath = converter.Convert(outputFileBase, container)
-                ? $"{outputFileBase}.mp3"
-                : downloadedPath;
+        await _youtube.Videos.DownloadAsync(
+            new IStreamInfo[] { audioStream, videoStream }, request, progress, ct);
 
-            progress?.Report(1.0);
-            return finalPath;
-        }
-        else
-        {
-            var videoStream = PickVideo(manifest, option);
-            var audioStream = manifest.GetAudioOnlyStreams().GetWithHighestBitrate();
-            var finalPath = $"{outputFileBase}.mp4";
-            var ffmpegExe = Path.Combine(_ffmpegDirectory, "ffmpeg.exe");
+        progress?.Report(1.0);
+        return mp4Path;
+    }
 
-            var request = new ConversionRequestBuilder(finalPath)
-                .SetFFmpegPath(ffmpegExe)
-                .Build();
+    public async Task<string> DownloadAudioContainerAsync(
+        VideoEntry video,
+        StreamOption option,
+        string outputDirectory,
+        IProgress<double>? progress = null,
+        CancellationToken ct = default)
+    {
+        Directory.CreateDirectory(outputDirectory);
+        var manifest = await _youtube.Videos.Streams.GetManifestAsync(video.Url, ct);
+        var title = SanitizeText(video.Title);
+        var outputFileBase = Path.Combine(outputDirectory, title);
 
-            await _youtube.Videos.DownloadAsync(
-                new IStreamInfo[] { audioStream, videoStream }, request, progress, ct);
+        var audio = PickAudio(manifest, option);
+        var containerPath = $"{outputFileBase}.{audio.Container.Name}";
+        await _youtube.Videos.Streams.DownloadAsync(audio, containerPath, progress, ct);
+        return containerPath;
+    }
 
-            progress?.Report(1.0);
-            return finalPath;
-        }
+    public string ConvertToMp3(string containerPath)
+    {
+        var directory = Path.GetDirectoryName(containerPath) ?? string.Empty;
+        var baseName = Path.GetFileNameWithoutExtension(containerPath);
+        var container = Path.GetExtension(containerPath).TrimStart('.');
+        var outputFileBase = Path.Combine(directory, baseName);
+
+        var converter = new MP3Converter(_ffmpegDirectory);
+        return converter.Convert(outputFileBase, container)
+            ? $"{outputFileBase}.mp3"
+            : containerPath;
     }
 
     private static IEnumerable<AudioOnlyStreamInfo> PreferMp4Audio(StreamManifest manifest)
