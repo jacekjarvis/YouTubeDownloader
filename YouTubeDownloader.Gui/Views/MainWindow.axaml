@@ -16,7 +16,9 @@
     <Window.Styles>
         <!-- Rotating ring used as a small activity spinner on each row. -->
         <Style Selector="Ellipse.spinner">
-            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+            <!-- Percentages = relative to the shape's center; bare numbers would be absolute pixels
+                 (which makes it orbit the top-left corner instead of spinning in place). -->
+            <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
             <Style.Animations>
                 <Animation Duration="0:0:0.9" IterationCount="INFINITE" Easing="LinearEasing">
                     <KeyFrame Cue="0%">

@@ -263,7 +263,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 var containerPath = await _service.DownloadAudioContainerAsync(item.Entry, quality, OutputDirectory, progress, itemCt);
                 finished = true;
                 item.Progress = 0.95;
-                item.SetState(DownloadState.Converting, "Queued for MP3…");
+                item.SetState(DownloadState.QueuedForConversion, "Queued for MP3…");
                 UpdateOverall(selected);
                 await channel!.Writer.WriteAsync(new ConversionJob(item, containerPath), CancellationToken.None);
             }
@@ -326,7 +326,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private static bool IsStillActive(VideoItemViewModel item)
         => item.State is DownloadState.Pending or DownloadState.Downloading
-            or DownloadState.Converting or DownloadState.Paused;
+            or DownloadState.QueuedForConversion or DownloadState.Converting or DownloadState.Paused;
 
     [RelayCommand]
     private void Cancel() => _cts?.Cancel();

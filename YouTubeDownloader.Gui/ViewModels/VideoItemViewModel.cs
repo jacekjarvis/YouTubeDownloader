@@ -8,13 +8,14 @@ namespace YouTubeDownloader.Gui.ViewModels;
 /// <summary>Where a row is in its lifecycle. Drives both the status text and the row's icons/buttons.</summary>
 public enum DownloadState
 {
-    Pending,      // selected, waiting its turn
-    Downloading,  // actively downloading
-    Converting,   // downloaded; queued for / running the mp3 conversion
-    Done,         // finished successfully
-    Failed,       // errored (or cancelled)
-    Paused,       // user paused it; the worker skips it until resumed
-    Skipped       // not selected for this run
+    Pending,              // selected, waiting its turn
+    Downloading,          // actively downloading
+    QueuedForConversion,  // downloaded; waiting in line for the mp3 converter
+    Converting,           // actively being converted to mp3 right now
+    Done,                 // finished successfully
+    Failed,               // errored (or cancelled)
+    Paused,               // user paused it; the worker skips it until resumed
+    Skipped               // not selected for this run
 }
 
 /// <summary>One row in the videos list — a single video that can be (de)selected, paused, and tracks its own progress.</summary>
