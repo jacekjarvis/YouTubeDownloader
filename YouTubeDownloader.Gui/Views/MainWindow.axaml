@@ -13,6 +13,23 @@
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
+    <Window.Styles>
+        <!-- Rotating ring used as a small activity spinner on each row. -->
+        <Style Selector="Ellipse.spinner">
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+            <Style.Animations>
+                <Animation Duration="0:0:0.9" IterationCount="INFINITE" Easing="LinearEasing">
+                    <KeyFrame Cue="0%">
+                        <Setter Property="RotateTransform.Angle" Value="0"/>
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="RotateTransform.Angle" Value="360"/>
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+    </Window.Styles>
+
     <DockPanel Margin="20">
 
         <!-- Header -->
@@ -114,9 +131,30 @@
                                                            TextTrimming="CharacterEllipsis"/>
                                                 <TextBlock Text="{Binding SubTitle}" FontSize="12" Opacity="0.6"/>
                                             </StackPanel>
-                                            <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding Status}"
-                                                       VerticalAlignment="Center" FontSize="12"
-                                                       Margin="10,0,0,0"/>
+
+                                            <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal"
+                                                        Spacing="8" VerticalAlignment="Center" Margin="10,0,0,0">
+                                                <!-- Blue spinner while downloading -->
+                                                <Ellipse Width="13" Height="13" Classes="spinner"
+                                                         Stroke="#4FC3F7" StrokeThickness="2"
+                                                         StrokeDashArray="16,6"
+                                                         VerticalAlignment="Center"
+                                                         IsVisible="{Binding IsDownloading}"/>
+                                                <!-- Amber spinner while converting to mp3 -->
+                                                <Ellipse Width="13" Height="13" Classes="spinner"
+                                                         Stroke="#FFB74D" StrokeThickness="2"
+                                                         StrokeDashArray="16,6"
+                                                         VerticalAlignment="Center"
+                                                         IsVisible="{Binding IsConverting}"/>
+                                                <TextBlock Text="{Binding Status}" VerticalAlignment="Center"
+                                                           FontSize="12"/>
+                                                <Button Content="{Binding PauseButtonText}"
+                                                        Command="{Binding TogglePauseCommand}"
+                                                        IsVisible="{Binding CanTogglePause}"
+                                                        Padding="8,2" FontSize="11"
+                                                        VerticalAlignment="Center"/>
+                                            </StackPanel>
+
                                             <ProgressBar Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
                                                          Minimum="0" Maximum="1" Height="6" Margin="0,6,0,0"
                                                          Value="{Binding Progress}"/>

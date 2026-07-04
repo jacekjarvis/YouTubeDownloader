@@ -143,37 +143,88 @@ public partial class MainWindowViewModel : ViewModelBase
         foreach (var v in Videos)
         {
             v.Progress = 0;
-            v.Status = v.IsSelected ? "Queued" : "Skipped";
+            v.ActiveDownloadCts = null;
             v.ControlsEnabled = false;
+            if (v.IsSelected)
+            {
+                v.SetState(DownloadState.Pending, "Queued");
+                v.CanPause = true;
+            }
+            else
+            {
+                v.SetState(DownloadState.Skipped, "Skipped");
+                v.CanPause = false;
+            }
+        }
+
+        // Audio runs the mp3 conversions on a background worker fed by this queue; video has no
+        // separate conversion stage, so it doesn't need one.
+        Channel<ConversionJob>? channel = null;
+        Task? converter = null;
+        if (kind == MediaKind.Audio)
+        {
+            channel = Channel.CreateUnbounded<ConversionJob>();
+            converter = Task.Run(() => ConsumeConversionsAsync(channel.Reader, selected, ct));
         }
 
         try
         {
-            if (kind == MediaKind.Audio)
-                await RunAudioPipelineAsync(selected, quality, ct);
-            else
-                await RunVideoDownloadsAsync(selected, quality, ct);
+            // Keep pulling the next eligible row until everything's resolved. Paused rows are
+            // skipped; if only paused rows remain, idle until the user resumes one (or cancels).
+            while (true)
+            {
+                ct.ThrowIfCancellationRequested();
 
-            var ok = CompletedCount();
-            Status = $"Finished — {ok} of {total} downloaded to {OutputDirectory}";
+                var next = selected.FirstOrDefault(v => v.State == DownloadState.Pending);
+                if (next is null)
+                {
+                    if (selected.Any(v => v.State == DownloadState.Paused))
+                    {
+                        Status = "Paused — resume items to continue, or press Cancel.";
+                        await Task.Delay(250, ct);
+                        continue;
+                    }
+                    break; // nothing left downloading, converting or waiting
+                }
+
+                await DownloadOneAsync(next, kind, quality, channel, selected, ct);
+            }
+
+            if (kind == MediaKind.Audio)
+                Status = "Finishing conversions…";
         }
         catch (OperationCanceledException)
         {
             cancelled = true;
-            foreach (var item in selected.Where(IsStillPending))
-                item.Status = "Cancelled";
-            Status = $"Cancelled — {CompletedCount()} of {total} completed before stopping.";
+            foreach (var item in selected.Where(IsStillActive))
+                item.SetState(DownloadState.Failed, "Cancelled");
         }
         finally
         {
+            // Close the conversion queue and let the worker drain (it's a no-op for video).
+            channel?.Writer.Complete();
+            if (converter is not null)
+            {
+                try { await converter; }
+                catch { /* the worker swallows its own errors; nothing to surface here */ }
+            }
+
             IsBusy = false;
             Url = string.Empty; // clear the address box now the run is finished
             foreach (var v in Videos)
+            {
                 v.ControlsEnabled = true;
+                v.CanPause = false;
+                v.ActiveDownloadCts = null;
+            }
             _cts.Dispose();
             _cts = null;
 
             var ok = CompletedCount();
+            Status = cancelled
+                ? $"Cancelled — {ok} of {total} completed before stopping."
+                : $"Finished — {ok} of {total} downloaded to {OutputDirectory}";
+
             var title = cancelled ? "Download cancelled" : "Download complete";
             var message = cancelled
                 ? $"Stopped after {ok} of {total}.\nFiles saved so far are in the folder below."
@@ -182,112 +233,68 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
-    // Video downloads mux audio+video through ffmpeg as they stream, so there's no separate
-    // conversion stage; run them one at a time. Task.Run keeps any synchronous ffmpeg work off
-    // the UI thread so the window stays responsive.
-    private async Task RunVideoDownloadsAsync(List<VideoItemViewModel> selected, StreamOption quality, CancellationToken ct)
+    // Downloads a single row. Audio hands the finished container to the conversion worker and
+    // returns immediately (so the next download can start); video downloads+muxes in one go.
+    // A per-row cancellation source lets the user pause just this download and re-queue it.
+    private async Task DownloadOneAsync(
+        VideoItemViewModel item, MediaKind kind, StreamOption quality,
+        Channel<ConversionJob>? channel, List<VideoItemViewModel> selected, CancellationToken ct)
     {
-        var index = 0;
-        foreach (var item in selected)
+        using var itemCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        item.ActiveDownloadCts = itemCts;
+        var itemCt = itemCts.Token;
+
+        var finished = false; // guard against late Progress<double> callbacks reverting the row
+        item.SetState(DownloadState.Downloading, "Downloading…");
+        var progress = new Progress<double>(p =>
         {
-            ct.ThrowIfCancellationRequested();
-            index++;
-
-            var finished = false; // guard against late Progress<double> callbacks reverting the row
-            item.Status = "Downloading…";
-            var progress = new Progress<double>(p =>
-            {
-                if (finished) return;
-                item.Progress = p;
-                UpdateOverall(selected);
-            });
-
-            try
-            {
-                Status = selected.Count > 1
-                    ? $"Downloading {index} of {selected.Count}: {item.Title}"
-                    : $"Downloading: {item.Title}";
-
-                await Task.Run(() => _service.DownloadAsync(item.Entry, MediaKind.Video, quality, OutputDirectory, progress, ct), ct);
-
-                finished = true;
-                item.Progress = 1;
-                item.Status = "Done ✓";
-            }
-            catch (OperationCanceledException)
-            {
-                finished = true;
-                throw;
-            }
-            catch (Exception ex)
-            {
-                finished = true;
-                item.Status = $"Failed: {ex.Message}";
-            }
-
+            if (finished) return;
+            // For audio, downloads own the first 95% of the bar and conversion fills the rest.
+            item.Progress = kind == MediaKind.Audio ? p * 0.95 : p;
             UpdateOverall(selected);
-        }
-    }
-
-    // Audio: download each file back-to-back (network-bound, non-blocking) and hand each finished
-    // container to a single background worker that runs the mp3 conversions. Downloads never wait
-    // on a conversion, and the (synchronous) ffmpeg work stays off the UI thread.
-    private async Task RunAudioPipelineAsync(List<VideoItemViewModel> selected, StreamOption quality, CancellationToken ct)
-    {
-        var channel = Channel.CreateUnbounded<ConversionJob>();
-        var converter = Task.Run(() => ConsumeConversionsAsync(channel.Reader, selected, ct));
+        });
 
         try
         {
-            var index = 0;
-            foreach (var item in selected)
+            Status = $"Downloading: {item.Title}";
+
+            if (kind == MediaKind.Audio)
             {
-                ct.ThrowIfCancellationRequested();
-                index++;
-
-                var finished = false; // guard against late download progress reverting the row
-                item.Status = "Downloading…";
-                // Downloads own the first 95% of each row's bar; the mp3 conversion fills the rest.
-                var progress = new Progress<double>(p =>
-                {
-                    if (finished) return;
-                    item.Progress = p * 0.95;
-                    UpdateOverall(selected);
-                });
-
-                try
-                {
-                    Status = selected.Count > 1
-                        ? $"Downloading {index} of {selected.Count}: {item.Title}"
-                        : $"Downloading: {item.Title}";
-
-                    var containerPath = await _service.DownloadAudioContainerAsync(item.Entry, quality, OutputDirectory, progress, ct);
-
-                    finished = true;
-                    item.Progress = 0.95;
-                    item.Status = "Queued for MP3…";
-                    UpdateOverall(selected);
-
-                    await channel.Writer.WriteAsync(new ConversionJob(item, containerPath), CancellationToken.None);
-                }
-                catch (OperationCanceledException)
-                {
-                    finished = true;
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    finished = true;
-                    item.Status = $"Failed: {ex.Message}";
-                    UpdateOverall(selected);
-                }
+                var containerPath = await _service.DownloadAudioContainerAsync(item.Entry, quality, OutputDirectory, progress, itemCt);
+                finished = true;
+                item.Progress = 0.95;
+                item.SetState(DownloadState.Converting, "Queued for MP3…");
+                UpdateOverall(selected);
+                await channel!.Writer.WriteAsync(new ConversionJob(item, containerPath), CancellationToken.None);
             }
+            else
+            {
+                await Task.Run(() => _service.DownloadAsync(item.Entry, MediaKind.Video, quality, OutputDirectory, progress, itemCt), itemCt);
+                finished = true;
+                item.Progress = 1;
+                item.SetState(DownloadState.Done, "Done ✓");
+                UpdateOverall(selected);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            finished = true;
+            if (ct.IsCancellationRequested)
+                throw; // whole run was cancelled — let it bubble up
+            // Otherwise the user paused just this row; put it back so it can be resumed.
+            item.Progress = 0;
+            item.SetState(DownloadState.Paused, "Paused");
+            UpdateOverall(selected);
+        }
+        catch (Exception ex)
+        {
+            finished = true;
+            item.SetState(DownloadState.Failed, $"Failed: {ex.Message}");
+            UpdateOverall(selected);
         }
         finally
         {
-            // Always close the queue and let the worker drain, even on cancellation, so it never hangs.
-            channel.Writer.Complete();
-            await converter;
+            item.ActiveDownloadCts = null;
         }
     }
 
@@ -297,16 +304,16 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             if (ct.IsCancellationRequested)
             {
-                await Dispatcher.UIThread.InvokeAsync(() => job.Item.Status = "Cancelled");
+                await Dispatcher.UIThread.InvokeAsync(() => job.Item.SetState(DownloadState.Failed, "Cancelled"));
                 continue;
             }
 
-            await Dispatcher.UIThread.InvokeAsync(() => job.Item.Status = "Converting to MP3…");
+            await Dispatcher.UIThread.InvokeAsync(() => job.Item.SetState(DownloadState.Converting, "Converting to MP3…"));
             _service.ConvertToMp3(job.ContainerPath); // blocking ffmpeg work, on this background thread
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 job.Item.Progress = 1;
-                job.Item.Status = "Done ✓";
+                job.Item.SetState(DownloadState.Done, "Done ✓");
                 UpdateOverall(selected);
             });
         }
@@ -315,10 +322,11 @@ public partial class MainWindowViewModel : ViewModelBase
     private void UpdateOverall(List<VideoItemViewModel> selected)
         => OverallProgress = selected.Count == 0 ? 0 : selected.Sum(v => v.Progress) / selected.Count;
 
-    private int CompletedCount() => Videos.Count(v => v.Status == "Done ✓");
+    private int CompletedCount() => Videos.Count(v => v.State == DownloadState.Done);
 
-    private static bool IsStillPending(VideoItemViewModel item)
-        => item.Status is "Queued" or "Downloading…" or "Queued for MP3…" or "Converting to MP3…";
+    private static bool IsStillActive(VideoItemViewModel item)
+        => item.State is DownloadState.Pending or DownloadState.Downloading
+            or DownloadState.Converting or DownloadState.Paused;
 
     [RelayCommand]
     private void Cancel() => _cts?.Cancel();
