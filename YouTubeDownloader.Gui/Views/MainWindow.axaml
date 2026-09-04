@@ -157,8 +157,14 @@
                 </StackPanel>
                 <ScrollViewer IsVisible="{Binding HasVideos}">
                     <StackPanel>
-                        <TextBlock Text="{Binding PlaylistInfo}" Margin="12,10,12,4"
-                                   FontWeight="SemiBold" IsVisible="{Binding IsPlaylist}"/>
+                        <Grid ColumnDefinitions="*,Auto" Margin="12,10,12,4"
+                              IsVisible="{Binding IsPlaylist}">
+                            <TextBlock Grid.Column="0" Text="{Binding PlaylistInfo}"
+                                       FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            <CheckBox Grid.Column="1" Content="Select all"
+                                      IsChecked="{Binding IsSelectAll}"
+                                      IsEnabled="{Binding !IsBusy}"/>
+                        </Grid>
                         <ItemsControl ItemsSource="{Binding Videos}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:VideoItemViewModel">

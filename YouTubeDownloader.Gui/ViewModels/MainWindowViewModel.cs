@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Linq;
 using System.Threading;
 using System.Threading.Channels;
@@ -24,6 +26,13 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly IYoutubeService _service;
     private CancellationTokenSource? _cts;
 
+    /// <summary>
+    /// Guards against feedback loops between <see cref="IsSelectAll"/> and each row's
+    /// <see cref="VideoItemViewModel.IsSelected"/>: set while either one is driving the other,
+    /// so the reacting side doesn't loop back and reassert the change it was just given.
+    /// </summary>
+    private bool _syncingSelectAll;
+
     /// <summary>Raised (on the UI thread) when a download run ends, so the view can show a completion dialog.</summary>
     public event Action<DownloadCompletedInfo>? DownloadCompleted;
 
@@ -36,12 +45,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         // The step-by-step UI keys off "are there results?" and "is a quality chosen?", so both
         // collections have to push those derived flags whenever they change.
-        Videos.CollectionChanged += (_, _) =>
-        {
-            OnPropertyChanged(nameof(HasVideos));
-            OnPropertyChanged(nameof(ShowDownloadButton));
-            OnPropertyChanged(nameof(ShowQualityRetry));
-        };
+        Videos.CollectionChanged += OnVideosCollectionChanged;
         QualityOptions.CollectionChanged += (_, _) =>
         {
             OnPropertyChanged(nameof(HasQualityOptions));
@@ -49,6 +53,40 @@ public partial class MainWindowViewModel : ViewModelBase
             OnPropertyChanged(nameof(ShowPlaylistProgress));
             OnPropertyChanged(nameof(QualityPlaceholder));
         };
+    }
+
+    // Keeps the header "select all" checkbox in sync with the rows: watches every row's
+    // IsSelected so ticking/unticking one updates the header, and (un)subscribes as rows are
+    // added or removed (a fresh Fetch clears and repopulates the whole list each time).
+    private void OnVideosCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.OldItems is not null)
+            foreach (VideoItemViewModel v in e.OldItems)
+                v.PropertyChanged -= OnVideoPropertyChanged;
+
+        if (e.NewItems is not null)
+            foreach (VideoItemViewModel v in e.NewItems)
+                v.PropertyChanged += OnVideoPropertyChanged;
+
+        OnPropertyChanged(nameof(HasVideos));
+        OnPropertyChanged(nameof(ShowDownloadButton));
+        OnPropertyChanged(nameof(ShowQualityRetry));
+        RecomputeSelectAll();
+    }
+
+    private void OnVideoPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(VideoItemViewModel.IsSelected))
+            RecomputeSelectAll();
+    }
+
+    /// <summary>Reflects the rows' current selection onto the header checkbox without re-triggering it.</summary>
+    private void RecomputeSelectAll()
+    {
+        if (_syncingSelectAll) return;
+        _syncingSelectAll = true;
+        IsSelectAll = Videos.Count > 0 && Videos.All(v => v.IsSelected);
+        _syncingSelectAll = false;
     }
 
     [ObservableProperty] private string _url = string.Empty;
@@ -74,6 +112,9 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowDownloadButton))]
     private StreamOption? _selectedQuality;
+
+    /// <summary>Header checkbox above the video list: ticks/unticks every row in one click.</summary>
+    [ObservableProperty] private bool _isSelectAll = true;
 
     public ObservableCollection<VideoItemViewModel> Videos { get; } = new();
     public ObservableCollection<StreamOption> QualityOptions { get; } = new();
@@ -102,6 +143,18 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         if (HasVideos && !IsBusy)
             _ = ReloadQualitiesAsync();
+    }
+
+    // Ticking/unticking the header checkbox pushes that state onto every row. Guarded by
+    // _syncingSelectAll so RecomputeSelectAll (driven by the rows we're about to change) doesn't
+    // immediately fire back and reassert the value we're already setting.
+    partial void OnIsSelectAllChanged(bool value)
+    {
+        if (_syncingSelectAll) return;
+        _syncingSelectAll = true;
+        foreach (var v in Videos)
+            v.IsSelected = value;
+        _syncingSelectAll = false;
     }
 
     [RelayCommand]
@@ -228,6 +281,10 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void ClearResults()
     {
+        // Collection-Reset events (from Clear()) don't carry OldItems, so detach explicitly here
+        // rather than leaving OnVideosCollectionChanged to try.
+        foreach (var v in Videos)
+            v.PropertyChanged -= OnVideoPropertyChanged;
         Videos.Clear();
         QualityOptions.Clear();
         SelectedQuality = null;
