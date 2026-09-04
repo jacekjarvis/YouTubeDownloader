@@ -14,6 +14,13 @@ namespace YouTubeDownloader.Gui.ViewModels;
 
 public partial class MainWindowViewModel : ViewModelBase
 {
+    /// <summary>
+    /// How many videos to try when building the quality list. A playlist can open with an entry
+    /// that's private, removed or region-blocked; probing a few more keeps the dropdown populated
+    /// instead of leaving the user staring at an empty list.
+    /// </summary>
+    private const int QualityProbeLimit = 5;
+
     private readonly IYoutubeService _service;
     private CancellationTokenSource? _cts;
 
@@ -26,28 +33,75 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         _service = service;
         OutputDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+
+        // The step-by-step UI keys off "are there results?" and "is a quality chosen?", so both
+        // collections have to push those derived flags whenever they change.
+        Videos.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(HasVideos));
+            OnPropertyChanged(nameof(ShowDownloadButton));
+            OnPropertyChanged(nameof(ShowQualityRetry));
+        };
+        QualityOptions.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(HasQualityOptions));
+            OnPropertyChanged(nameof(ShowQualityRetry));
+            OnPropertyChanged(nameof(ShowPlaylistProgress));
+            OnPropertyChanged(nameof(QualityPlaceholder));
+        };
     }
 
     [ObservableProperty] private string _url = string.Empty;
     [ObservableProperty] private string _outputDirectory;
     [ObservableProperty] private bool _isAudio;
-    [ObservableProperty] private bool _isBusy;
-    [ObservableProperty] private bool _isPlaylist;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowQualityRetry))]
+    private bool _isBusy;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowPlaylistProgress))]
+    private bool _isPlaylist;
     [ObservableProperty] private string _playlistInfo = string.Empty;
-    [ObservableProperty] private string _status = "Paste a YouTube video or playlist link to begin.";
+    [ObservableProperty] private string _status = "Paste a YouTube video or playlist link, then press Fetch.";
     [ObservableProperty] private double _overallProgress;
-    [ObservableProperty] private StreamOption? _selectedQuality;
+
+    /// <summary>True while the quality list is being read, so the dropdown can say so.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(QualityPlaceholder))]
+    private bool _isLoadingQualities;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowDownloadButton))]
+    private StreamOption? _selectedQuality;
 
     public ObservableCollection<VideoItemViewModel> Videos { get; } = new();
     public ObservableCollection<StreamOption> QualityOptions { get; } = new();
 
+    /// <summary>Step 2 of the UI (format, folder, quality) only exists once a fetch returned videos.</summary>
     public bool HasVideos => Videos.Count > 0;
+
+    public bool HasQualityOptions => QualityOptions.Count > 0;
+
+    /// <summary>Step 3: the Download button appears only once a quality has actually been chosen.</summary>
+    public bool ShowDownloadButton => HasVideos && SelectedQuality is not null;
+
+    /// <summary>Offer a retry when the quality probe came back empty (e.g. a transient YouTube error).</summary>
+    public bool ShowQualityRetry => HasVideos && !HasQualityOptions && !IsBusy;
+
+    /// <summary>Playlist progress and the per-video quality note only matter once downloading is possible.</summary>
+    public bool ShowPlaylistProgress => IsPlaylist && HasQualityOptions;
+
+    public string QualityPlaceholder =>
+        IsLoadingQualities ? "Reading available qualities…"
+        : HasQualityOptions ? "Choose a quality…"
+        : "No qualities available — press Retry";
 
     // Reload the quality list whenever the user flips between Video and Audio.
     partial void OnIsAudioChanged(bool value)
     {
         if (HasVideos && !IsBusy)
-            _ = LoadQualityOptionsAsync();
+            _ = ReloadQualitiesAsync();
     }
 
     [RelayCommand]
@@ -65,10 +119,15 @@ public partial class MainWindowViewModel : ViewModelBase
         try
         {
             Status = "Fetching details…";
-            Videos.Clear();
-            OnPropertyChanged(nameof(HasVideos));
+            ClearResults();
 
             var resolved = await _service.ResolveAsync(Url.Trim());
+
+            if (resolved.Videos.Count == 0)
+            {
+                Status = "That link resolved, but it contains no videos.";
+                return;
+            }
 
             foreach (var v in resolved.Videos)
                 Videos.Add(new VideoItemViewModel(v));
@@ -77,19 +136,19 @@ public partial class MainWindowViewModel : ViewModelBase
             PlaylistInfo = resolved.IsPlaylist
                 ? $"Playlist: {resolved.Title}  ({resolved.Videos.Count} videos)"
                 : string.Empty;
-            OnPropertyChanged(nameof(HasVideos));
 
-            await LoadQualityOptionsAsync();
+            // A failure in there leaves its own explanation in Status — don't paint over it.
+            if (!await LoadQualityOptionsAsync())
+                return;
 
             Status = resolved.IsPlaylist
-                ? $"Found {resolved.Videos.Count} videos. Choose format & quality, then Download."
-                : "Ready. Choose format & quality, then Download.";
+                ? $"Found {resolved.Videos.Count} videos. Choose a quality, then Download."
+                : "Ready. Choose a quality, then Download.";
         }
         catch (Exception ex)
         {
+            ClearResults();
             Status = $"Couldn't fetch that link: {ex.Message}";
-            IsPlaylist = false;
-            PlaylistInfo = string.Empty;
         }
         finally
         {
@@ -97,19 +156,83 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
-    private async Task LoadQualityOptionsAsync()
+    /// <summary>Re-reads the quality list on its own (format switch, or the Retry button).</summary>
+    [RelayCommand]
+    private async Task ReloadQualitiesAsync()
     {
-        if (!HasVideos) return;
+        if (IsBusy || !HasVideos) return;
+
+        IsBusy = true;
+        try
+        {
+            if (await LoadQualityOptionsAsync())
+                Status = "Ready. Choose a quality, then Download.";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// Fills <see cref="QualityOptions"/> from the first video that will give up a stream manifest.
+    /// Returns false (with an explanation in <see cref="Status"/>) if none of them will.
+    /// </summary>
+    private async Task<bool> LoadQualityOptionsAsync()
+    {
+        QualityOptions.Clear();
+        SelectedQuality = null;
+
+        if (!HasVideos) return false;
 
         var kind = IsAudio ? MediaKind.Audio : MediaKind.Video;
-        var representative = Videos[0].Entry.Url;
-        var options = await _service.GetStreamOptionsAsync(representative, kind);
+        IsLoadingQualities = true;
+        try
+        {
+            Status = "Reading available qualities…";
 
+            string? lastError = null;
+            foreach (var candidate in Videos.Take(QualityProbeLimit))
+            {
+                try
+                {
+                    var options = await _service.GetStreamOptionsAsync(candidate.Entry.Url, kind);
+                    if (options.Count == 0)
+                    {
+                        var what = kind == MediaKind.Audio ? "audio" : "video";
+                        lastError = $"\"{candidate.Title}\" has no downloadable {what} streams.";
+                        continue;
+                    }
+
+                    foreach (var o in options)
+                        QualityOptions.Add(o);
+
+                    SelectedQuality = QualityOptions[0];
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    lastError = ex.Message;
+                }
+            }
+
+            Status = $"Couldn't read the quality list — {lastError} " +
+                     "It may be private, removed or region-blocked. Press Retry to try again.";
+            return false;
+        }
+        finally
+        {
+            IsLoadingQualities = false;
+        }
+    }
+
+    private void ClearResults()
+    {
+        Videos.Clear();
         QualityOptions.Clear();
-        foreach (var o in options)
-            QualityOptions.Add(o);
-
-        SelectedQuality = QualityOptions.FirstOrDefault();
+        SelectedQuality = null;
+        IsPlaylist = false;
+        PlaylistInfo = string.Empty;
     }
 
     [RelayCommand]

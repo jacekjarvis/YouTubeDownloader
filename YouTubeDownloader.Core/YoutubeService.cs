@@ -9,6 +9,13 @@ namespace YouTubeDownloader.Core;
 
 public class YoutubeService : IYoutubeService
 {
+    /// <summary>
+    /// Marker appended to a downloaded audio container's name. YouTube's audio-only streams are
+    /// usually mp4 too, so writing a plain "{title}.mp4" would overwrite — and then, after the mp3
+    /// extraction, delete — a video download of the same clip sitting in the same folder.
+    /// </summary>
+    private const string AudioContainerSuffix = ".audio-part";
+
     private readonly YoutubeClient _youtube = new();
     private readonly string _ffmpegDirectory;
 
@@ -157,7 +164,7 @@ public class YoutubeService : IYoutubeService
         var outputFileBase = Path.Combine(outputDirectory, title);
 
         var audio = PickAudio(manifest, option);
-        var containerPath = $"{outputFileBase}.{audio.Container.Name}";
+        var containerPath = $"{outputFileBase}{AudioContainerSuffix}.{audio.Container.Name}";
         await _youtube.Videos.Streams.DownloadAsync(audio, containerPath, progress, ct);
         return containerPath;
     }
@@ -166,13 +173,13 @@ public class YoutubeService : IYoutubeService
     {
         var directory = Path.GetDirectoryName(containerPath) ?? string.Empty;
         var baseName = Path.GetFileNameWithoutExtension(containerPath);
-        var container = Path.GetExtension(containerPath).TrimStart('.');
-        var outputFileBase = Path.Combine(directory, baseName);
+        if (baseName.EndsWith(AudioContainerSuffix, StringComparison.Ordinal))
+            baseName = baseName[..^AudioContainerSuffix.Length];
+
+        var mp3Path = Path.Combine(directory, $"{baseName}.mp3");
 
         var converter = new MP3Converter(_ffmpegDirectory);
-        return converter.Convert(outputFileBase, container)
-            ? $"{outputFileBase}.mp3"
-            : containerPath;
+        return converter.Convert(containerPath, mp3Path) ? mp3Path : containerPath;
     }
 
     private static IEnumerable<AudioOnlyStreamInfo> PreferMp4Audio(StreamManifest manifest)

@@ -11,14 +11,15 @@ public class MP3Converter
     }
 
     /// <summary>
-    /// Converts "{source}.{fileType}" to "{source}.mp3" and deletes the original on success.
+    /// Converts <paramref name="sourcePath"/> to <paramref name="mp3Path"/> and deletes the
+    /// original container on success.
     /// </summary>
-    public bool Convert(string source, string fileType)
+    public bool Convert(string sourcePath, string mp3Path)
     {
         try
         {
-            FFMpeg.ExtractAudio($"{source}.{fileType}", $"{source}.mp3");
-            File.Delete($"{source}.{fileType}");
+            FFMpeg.ExtractAudio(sourcePath, mp3Path);
+            File.Delete(sourcePath);
             return true;
         }
         catch
